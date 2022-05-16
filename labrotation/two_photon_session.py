@@ -1,4 +1,4 @@
-import belt_processing
+import legacy.belt_processing as belt_processing
 import pyabf as abf  # https://pypi.org/project/pyabf/
 import pims_nd2
 import pandas as pd
@@ -8,7 +8,7 @@ import numpy as np
 import warnings
 from copy import deepcopy
 import json
-import nikon_ts_reader as ntsr
+import legacy.nikon_ts_reader as ntsr
 # heuristic value, hopefully valid for all recordings made with the digitizer module
 LFP_SCALING_FACTOR = 1.0038
 
@@ -299,3 +299,38 @@ class TwoPhotonSession:
     # TODO: get nikon frame matching time stamps (NIDAQ time)! It is session.nikon_daq_time
     def return_nikon_mean(self):
         return [self.nikon_movie[i_frame].mean() for i_frame in range(self.nikon_movie.sizes["t"])]
+
+
+def open_session(data_path: str) -> TwoPhotonSession:
+    # .nd2 file
+    nd2_path = askopenfilename(initialdir=data_path, title="Select .nd2 file")
+    print(f"Selected imaging file: {nd2_path}")
+
+    # nd2 info file (..._nik.txt) Image Proterties -> Recorded Data of .nd2 file saved as .txt
+    nd2_timestamps_path = nd2_path[:-4] + "_nik" + ".txt"
+    if not os.path.exists(nd2_timestamps_path):
+        nd2_timestamps_path = askopenfilename(initialdir=data_path,
+                                              title="Nikon info file not found. Please provide it!")
+    print(f"Selected nd2 info file: {nd2_timestamps_path}")
+
+    # labview .txt file
+    labview_path = askopenfilename(
+        initialdir=data_path, title="Select corresponding labview (xy.txt) file")
+    print(f"Selected LabView data file: {labview_path}")
+
+    # labview time stamp (...time.txt)
+    labview_timestamps_path = labview_path[
+        :-4] + "time" + ".txt"  # try to open the standard corresponding time stamp file first
+    if not os.path.exists(labview_timestamps_path):
+        labview_timestamps_path = askopenfilename(initialdir=data_path,
+                                                  title="Labview time stamp not found. Please provide it!")
+    print(f"Selected LabView time stamp file: {labview_timestamps_path}")
+
+    # lfp file (.abf)
+    lfp_path = askopenfilename(
+        initialdir=data_path, title="Select LFP .abf file")
+    print(f"Selected LFP file: {lfp_path}")
+
+    session = TwoPhotonSession(nd2_path=nd2_path, nd2_timestamps_path=nd2_timestamps_path, labview_path=labview_path,
+                               labview_timestamps_path=labview_timestamps_path, lfp_path=lfp_path)
+    return session
