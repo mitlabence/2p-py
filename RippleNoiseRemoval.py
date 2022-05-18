@@ -18,7 +18,7 @@ plt.show()
 
 
 class RNR():
-    def __init__(self, win, amplitude_threshold, n_threads):
+    def __init__(self, win, amplitude_threshold, n_threads: int = 1):
         self.win = win
         self.amplitude_threshold = amplitude_threshold
         self.end_x = 0
