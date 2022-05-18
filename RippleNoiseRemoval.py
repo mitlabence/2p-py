@@ -2,7 +2,7 @@ import pims_nd2
 import numpy as np
 from matplotlib import pyplot as plt
 from nd2_to_caiman import np_arr_from_nd2
-from multiprocessing import Pool
+from pathos.multiprocessing import ProcessingPool as Pool
 
 """
 # optional: show original figure of which plot is made
@@ -24,10 +24,6 @@ def rnr_frame(frame, win, amplitude_threshold):  # endx and endy should be
     freq_image[bright_spikes] = 0
     filt_image = np.fft.ifft2(freq_image)
     return np.abs(filt_image)
-
-
-def rnr_frame_default(frame):
-    return rnr_frame(frame, 40, 10.8)
 
 
 def plot_rnr(frame, win, amplitude_threshold):  # ex. frame = nd2_data[0, :, :]
@@ -87,22 +83,6 @@ def rnr():
     return filtered_data
 
 
-def rnr_par(n_threads: int = 2):
-    nd2_fpath = 'D:/PhD/Data/T386_MatlabTest/T386_20211202_green.nd2'
-    win = 40
-    amplitude_threshold = 10.8
 
-    nd2_data = np_arr_from_nd2(nd2_fpath)
-
-    filtered_data = np.zeros(nd2_data.shape)
-    chunksize = 100
-
-    with Pool() as pool:
-        for i_frame, processed_frame in enumerate(pool.imap(rnr_frame_default, nd2_data), chunksize):
-            filtered_data[i_frame] = processed_frame
-        """
-        for i_frame in range(nd2_data.shape[0]):
-            filtered_data[i_frame] = rnr_frame(
-                nd2_data[i_frame, :, :], win, amplitude_threshold)
-        """
-    return filtered_data
+	
+	
