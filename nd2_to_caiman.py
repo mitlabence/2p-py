@@ -1,4 +1,3 @@
-import caiman
 import numpy as np
 import pims_nd2  # pip install pims_nd2
 
