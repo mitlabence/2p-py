@@ -29,7 +29,7 @@ def open_file(title: str = "Select file") -> str:
     return askopenfilename(title=title)
 
 
-def open_dir(title: str = "Select data directory") -> str:
+def open_dir(title: str = "Select data directory", ending_slash: bool = False) -> str:
     """
     Opens a tkinter dialog to select a folder. Returns the path of the folder.
     :param title: The message to display in the open directory dialog.
@@ -40,4 +40,6 @@ def open_dir(title: str = "Select data directory") -> str:
     root.attributes("-topmost", True)
     root.withdraw()  # keep root window from appearing
     folder_path = askdirectory(title=title)
+    if ending_slash:
+        folder_path += "/"
     return folder_path

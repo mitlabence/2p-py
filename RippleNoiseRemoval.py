@@ -15,7 +15,7 @@ plt.show()
 # TODO: write test on test data to compare parallel and single thread RNR,
 #       also compare with Matlab RNR!
 # TODO: make it work for 2-channel recordings too!
-
+# TODO: make sure that encountering division by 0 does not affect end result (I guess then entry becomes INF, filtered out by threshold comparison! But check this!)
 
 class RNR():
     def __init__(self, win, amplitude_threshold, n_threads: int = 1):
@@ -43,7 +43,7 @@ class RNR():
         freq_image = np.fft.fftshift(np.fft.fft2(
             frame))  # make FFT
         # get log amplitude to detect spikes in fft
-        ampl_image = np.log(np.abs(freq_image))
+        ampl_image = np.log(np.abs(freq_image))  # D:\Codebase\2p-py\RippleNoiseRemoval.py:46: RuntimeWarning: divide by zero encountered in log ampl_image = np.log(np.abs(freq_image))
         bright_spikes = ampl_image > self.amplitude_threshold
         bright_spikes[round(self.end_x/2-self.win):round(self.end_x/2+self.win),
                       round(self.end_y/2-self.win):round(self.end_y/2+self.win)] = 0
