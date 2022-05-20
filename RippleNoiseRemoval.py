@@ -2,8 +2,6 @@ import pims_nd2
 import numpy as np
 from matplotlib import pyplot as plt
 from nd2_to_caiman import np_arr_from_nd2
-from pathos.multiprocessing import ProcessingPool as Pool
-from pathos.helpers import cpu_count
 
 """
 # optional: show original figure of which plot is made
@@ -17,6 +15,7 @@ plt.show()
 # TODO: make it work for 2-channel recordings too!
 # TODO: make sure that encountering division by 0 does not affect end result (I guess then entry becomes INF, filtered out by threshold comparison! But check this!)
 
+
 class RNR():
     def __init__(self, win, amplitude_threshold, n_threads: int = 1):
         self.win = win
@@ -28,7 +27,7 @@ class RNR():
         self.rnr_data = None  # contains RNR-processed data
         # TODO: if n_threads = 1, only do rnr_singlethread. Otherwise make sure computer has enough threads, perform parallel
         self.n_threads = n_threads
-        assert(self.n_threads <= cpu_count())
+        # assert(self.n_threads <= cpu_count())
 
     def open_recording(self, nd2_fpath):
         self.nd2_data = np_arr_from_nd2(nd2_fpath)
@@ -43,7 +42,8 @@ class RNR():
         freq_image = np.fft.fftshift(np.fft.fft2(
             frame))  # make FFT
         # get log amplitude to detect spikes in fft
-        ampl_image = np.log(np.abs(freq_image))  # D:\Codebase\2p-py\RippleNoiseRemoval.py:46: RuntimeWarning: divide by zero encountered in log ampl_image = np.log(np.abs(freq_image))
+        # D:\Codebase\2p-py\RippleNoiseRemoval.py:46: RuntimeWarning: divide by zero encountered in log ampl_image = np.log(np.abs(freq_image))
+        ampl_image = np.log(np.abs(freq_image))
         bright_spikes = ampl_image > self.amplitude_threshold
         bright_spikes[round(self.end_x/2-self.win):round(self.end_x/2+self.win),
                       round(self.end_y/2-self.win):round(self.end_y/2+self.win)] = 0
@@ -103,14 +103,14 @@ class RNR():
         print("RNR completed.")
         return self.rnr_data
 
-    def rnr_parallel(self):
-        # TODO: there are some issues with starting the pool again: https://github.com/uqfoundation/pathos/issues/111
-        # FIXME: Running this method again results in ValueError: Pool not running. Possible solution: try ... except ValueError: pool.restart()
-        # TODO: parallel seems much slower!
-        p = Pool(self.n_threads)
-        res_list = p.map(self.rnr_frame, self.nd2_data)
-        for i_frame, frame in enumerate(res_list):
-            self.rnr_data[i_frame] = frame
-        print(f"RNR with {self.n_threads} threads completed.")
-        p.close()
-        return self.rnr_data
+#    def rnr_parallel(self):
+#        # TODO: there are some issues with starting the pool again: https://github.com/uqfoundation/pathos/issues/111
+#        # FIXME: Running this method again results in ValueError: Pool not running. Possible solution: try ... except ValueError: pool.restart()
+#        # TODO: parallel seems much slower!
+#        p = Pool(self.n_threads)
+#        res_list = p.map(self.rnr_frame, self.nd2_data)
+#        for i_frame, frame in enumerate(res_list):
+#            self.rnr_data[i_frame] = frame
+#        print(f"RNR with {self.n_threads} threads completed.")
+#        p.close()
+#        return self.rnr_data
