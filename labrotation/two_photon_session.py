@@ -1,4 +1,4 @@
-import legacy.belt_processing as belt_processing
+import labrotation.belt_processing as belt_processing
 import pyabf as abf  # https://pypi.org/project/pyabf/
 import pims_nd2
 import pandas as pd
@@ -8,7 +8,7 @@ import numpy as np
 import warnings
 from copy import deepcopy
 import json
-import legacy.nikon_ts_reader as ntsr
+import labrotation.nikon_ts_reader as ntsr
 # heuristic value, hopefully valid for all recordings made with the digitizer module
 LFP_SCALING_FACTOR = 1.0038
 

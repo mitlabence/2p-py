@@ -1,5 +1,5 @@
 import matlab.engine
-from legacy.file_handling import open_dir, open_file
+from labrotation.file_handling import open_dir, open_file
 from os.path import exists
 
 
