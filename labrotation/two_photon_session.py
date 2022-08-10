@@ -52,6 +52,8 @@ class TwoPhotonSession:
             self.LFP_PATH = lfp_path
         if matlab_2p_folder is not None:
             self.MATLAB_2p_FOLDER = matlab_2p_folder
+        else:
+            raise ModuleNotFoundError("matlab-2p path was not ")
         self._open_data()
         for k, v in self.belt_dict.items():  # convert matlab arrays into numpy arrays
             self.belt_dict[k] = self._matlab_array_to_numpy_array(
@@ -89,6 +91,7 @@ class TwoPhotonSession:
     def _open_data(self):
         if self.ND2_PATH is not None:
             self.nikon_movie = pims_nd2.ND2_Reader(self.ND2_PATH)
+            # TODO: nikon_movie should be closed properly upon removing this class (or does the garbage collector take care of it?)
         if self.ND2_TIMESTAMPS_PATH is not None:
             try:
                 self.nikon_meta = pd.read_csv(
@@ -96,8 +99,7 @@ class TwoPhotonSession:
             except UnicodeDecodeError:
                 print(
                     "_open_data(): Timestamp file seems to be unusual. Trying to correct it.")
-                output_file_path = self.ND2_TIMESTAMPS_PATH[:-
-                                                            4] + "_corrected.txt"
+                output_file_path = self.ND2_TIMESTAMPS_PATH[:-4] + "_corrected.txt"
                 ntsr.standardize_stamp_file(
                     self.ND2_TIMESTAMPS_PATH, output_file_path, export_encoding="utf_16_le")
                 self.nikon_meta = pd.read_csv(
@@ -120,13 +122,41 @@ class TwoPhotonSession:
         # drop non-imaging frames from metadata
         self.nikon_meta.dropna(subset=["Index"], inplace=True)
 
-    def lfp_movement(self):
+    def _lfp_movement_raw(self):
         self.lfp_file.setSweep(sweepNumber=0, channel=1)
         return (self.lfp_file.sweepX, self.lfp_file.sweepY)
 
-    def lfp_lfp(self):
+    def _lfp_lfp_raw(self):
         self.lfp_file.setSweep(sweepNumber=0, channel=0)
         return (self.lfp_file.sweepX, self.lfp_file.sweepY)
+
+
+    def lfp_movement(self):
+        """
+        Returns columns of the lfp data internal dataframe as pandas Series: a tuple of (t_series, y_series) for lfp
+        channel 0 (lfp) data.
+        :return: tuple of two pandas Series
+        """
+        return (self.lfp_df["t_mov_corrected"], self.lfp_df["y_mov"])
+
+
+    def lfp_lfp(self):
+        """
+        Returns columns of the lfp data internal dataframe as pandas Series: a tuple of (t_series, y_series) for lfp
+        channel 1 (movement) data.
+        :return: tuple of two pandas Series
+        """
+        return (self.lfp_df["t_lfp_corrected"], self.lfp_df["y_lfp"])
+
+
+    def labview_movement(self):
+        """
+        Returns columns of the labview data internal dataframe as pandas Series: a tuple of (t_series, y_series)
+        for labView time and speed data.
+        :return: tuple of two pandas Series
+        """
+        return (self.belt_df.time_s, self.belt_df.speed)
+
 
     def _create_nikon_daq_time(self):
         self.nikon_daq_time = self.nikon_meta["NIDAQ Time [s]"]
@@ -143,11 +173,11 @@ class TwoPhotonSession:
     def shift_lfp(self, seconds: float = 0.0, match_type: str = "Nikon") -> None:
         """
         Shifts the LFP signal (+/-) by the amount of seconds: an event at time t to time (t+seconds), i.e. a positive seconds means shifting everything to a later time.
-        match_type: "Nikon" or "zero". "Nikon": match to the Nikon frames (NIDAQ time stamps). "zero": match to 0 s, and the last Nikon frame.
+        match_type: "Nikon" or "zero". "Nikon": match (cut) to the Nikon frames (NIDAQ time stamps). "zero": match to 0 s, and the last Nikon frame.
         """
         cut_begin = 0.0
         cut_end = self.nikon_daq_time.iloc[-1]
-        if match_type == "Nikon":
+        if match_type == "Nikon":  # TODO: match_type does not explain its own function
             cut_begin = self.nikon_daq_time.iloc[0]
         self.lfp_df, self.lfp_df_cut = self._create_lfp_df(
             self.time_offs - seconds, cut_begin, cut_end)
@@ -214,8 +244,8 @@ class TwoPhotonSession:
     def _create_lfp_df(self, time_offs: float, cut_begin: float, cut_end: float):
         lfp_df_new = pd.DataFrame()
         lfp_df_new_cut = pd.DataFrame()
-        t_mov, y_mov = self.lfp_movement()
-        t_lfp, y_lfp = self.lfp_lfp()
+        t_mov, y_mov = self._lfp_movement_raw()
+        t_lfp, y_lfp = self._lfp_lfp_raw()
         # add movement data
         lfp_df_new["t_mov_raw"] = t_mov
         lfp_df_new["t_mov_offset"] = lfp_df_new["t_mov_raw"] - time_offs
@@ -234,8 +264,8 @@ class TwoPhotonSession:
         lfp_df_new["t_lfp_raw"] = t_lfp
         lfp_df_new["t_lfp_offset"] = lfp_df_new["t_lfp_raw"] - time_offs
         # scale factor given in Bence's excel sheets
-        lfp_df_new["t_lfp_corrected"] = lfp_df_new["t_lfp_offset"] * \
-            LFP_SCALING_FACTOR
+        # TODO: document columns of dataframes. corrected vs offset
+        lfp_df_new["t_lfp_corrected"] = lfp_df_new["t_lfp_offset"] * LFP_SCALING_FACTOR
         lfp_df_new["y_lfp"] = y_lfp
 
         # cut lfp data
@@ -246,6 +276,28 @@ class TwoPhotonSession:
             lfp_df_new, cut_begin, cut_end)
 
         return lfp_df_new, lfp_df_new_cut
+
+    # now nd2_to_caiman.py
+    def get_nikon_data(self, i_begin: int = None, i_end: int = None) -> np.array:  # TODO: test this
+        # set iter_axes to "t"
+        # then: create nd array with sizes matching frame size,
+        sizes_dict = self.nikon_movie.sizes
+        pixel_type = self.nikon_movie.pixel_type
+        if (i_begin is not None) and (i_end is not None):
+            n_frames = i_end - i_begin
+            i_first = i_begin
+        else:
+            n_frames = sizes_dict['t']
+            i_first = 0
+        sizes = (n_frames, sizes_dict['x'], sizes_dict['y'])
+        # dtype would be float32 by default...
+        frames_arr = np.zeros(sizes, dtype=pixel_type)
+        for i_frame in range(n_frames):
+            frames_arr[i_frame] = np.array(self.nikon_movie[i_first + i_frame],
+                                           dtype=pixel_type)  # not sure if dtype needed here
+        return frames_arr
+
+
 
     def export_json(self, **kwargs) -> None:
         """
@@ -284,7 +336,7 @@ class TwoPhotonSession:
         params["lfp_path"] = self.LFP_PATH
         params["matlab_2p_folder"] = self.MATLAB_2p_FOLDER
 
-        params["time_offs"] = self.time_offs
+        params["time_offs"] = self.time_offs  # TODO: time_offs does not explain what it is (time offset between LFP and Nikon?)
         params["lfp_t_start"] = self.lfp_t_start.strftime("%Y.%m.%d-%H:%M:%S")
         params["nik_t_start"] = self.nik_t_start.strftime("%Y.%m.%d-%H:%M:%S")
         params["lfp_scaling"] = self.lfp_scaling
@@ -302,6 +354,8 @@ class TwoPhotonSession:
 
 
 def open_session(data_path: str) -> TwoPhotonSession:
+    # FIXME: askopenfilename from TKinter not working. Put into file_handling?
+    # TODO: test this function! Make it an alternative constructor? Or a static method
     # .nd2 file
     nd2_path = askopenfilename(initialdir=data_path, title="Select .nd2 file")
     print(f"Selected imaging file: {nd2_path}")
