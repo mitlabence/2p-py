@@ -7,10 +7,8 @@ def text_input_dialog(window_title: str = "Prompt window", prompt="Enter text") 
     Pop-up window with text input, used e.g. for acquiring metadata.
     :return: the user-specified text as a string
     """
-    text = ""
     root = Tk()
     root.geometry("1024x768")
     root.withdraw()
     root.update_idletasks()
-    simpledialog.askstring(window_title, prompt + "\t\t\t\t\t\t", parent=root)  # add tabs to increase window size
-    return text
+    return simpledialog.askstring(window_title, prompt + "\t\t\t\t\t\t", parent=root)  # add tabs to increase window size
