@@ -23,11 +23,18 @@ def sha256_of_all_in_dir(directory: str) -> List[str]:
     :param directory: the directory path in which to loop through all files and files in subfolders recursively.
     :return: a list of tuples, two str entries each: (absolute file path, hash value)
     """
+    n_files = 0
     file_hash_pairs = []  # list of tuples: (file path, hash), type: (str, str)
+    for root, dirs, files in os.walk(directory):
+        for filename in files:
+            n_files += 1
+    print(f"{n_files} files detected")
+    count = 0
     for root, dirs, files in os.walk(directory):
         for filename in files:
             fpath = os.path.normpath(os.path.join(root, filename))
             file_hash_pairs.append((fpath, sha256_of_file(fpath)))
+            print(count)
     return file_hash_pairs
 
 
