@@ -35,6 +35,7 @@ def sha256_of_all_in_dir(directory: str) -> List[str]:
             fpath = os.path.normpath(os.path.join(root, filename))
             file_hash_pairs.append((fpath, sha256_of_file(fpath)))
             print(count)
+            count += 1
     return file_hash_pairs
 
 
