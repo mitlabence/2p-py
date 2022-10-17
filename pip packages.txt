@@ -1,0 +1,7 @@
+Tips for pycharm:
+create a conda environment using 2p-py-env.txt. It will install almost all packages except the list below.
+Set this to the project interpreter in PyCharm. It might still run the default anaconda interpreter, and throw errors while importing stuff. Set the correct interpeter in the project configurations!
+
+
+pip install pyabf
+pip install pims_nd2
