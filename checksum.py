@@ -49,8 +49,8 @@ def sha256_dir_to_txt(directory: str, output_fpath: str) -> None:
             output_file.write(file_hash_tuple[0] + " : " + file_hash_tuple[1] + "\n")
     print(f"sha256_dir_to_txt: Successfully written results to\n{output_file_path}")
 
-
-filename = fh.get_filename_with_date("test_output")
-output_filepath = fh.choose_dir_for_saving_file("asd", filename)
-input_directory = fh.open_dir("Choose directory to run SHA256 on")
-sha256_dir_to_txt(input_directory, output_filepath)
+# Example usage:
+# filename = fh.get_filename_with_date("sha256_results")
+# output_filepath = fh.choose_dir_for_saving_file("Choose folder to save results", filename)
+# input_directory = fh.open_dir("Choose directory to run SHA256 on")
+# sha256_dir_to_txt(input_directory, output_filepath)
