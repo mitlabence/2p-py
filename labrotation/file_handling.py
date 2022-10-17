@@ -1,7 +1,11 @@
 from tkinter import Tk  # use tkinter to open files
 from tkinter.filedialog import askopenfilename, askdirectory
 import os.path
-# TODO: open_dir opens dialog in foreground (in Jupyter), thanks to root.attributes("-topmost", True). Implement this in other dialog callign functions!
+import datetime as dt
+
+
+# TODO: open_dir opens dialog in foreground (in Jupyter), thanks to root.attributes("-topmost", True). Implement this
+#  in other dialog callign functions!
 
 
 def raise_above_all(window):
@@ -36,3 +40,26 @@ def open_dir(title: str = "Select data directory", ending_slash: bool = False) -
     if ending_slash:
         folder_path += "/"
     return os.path.normpath(folder_path)
+
+
+def choose_dir_for_saving_file(title: str = "Select a folder to save the file to", fname: str = "output_file.txt"):
+    """
+    Opens a tkinter dialog to select a folder. Returns opened folder + file name as path string.
+    :param title:
+    :param fname:
+    :return:
+    """
+    return os.path.normpath(os.path.join(open_dir(title), fname))
+
+
+def get_filename_with_date(raw_filename: str = "output_file", extension: str = ".txt"):
+    """
+    Given a root filename,
+    :param raw_filename: file name without extension
+    :param extension:
+    :return:
+    """
+    # todo: this should be a bit more sophisticated. (dealing with cases like extension without "." etc.), getting rid
+    #  of extension in raw_filename if supplied...
+    datetime_suffix = dt.datetime.now().strftime("%y-%m-%d_%H-%M-%S")
+    return raw_filename + "_" + datetime_suffix + extension
