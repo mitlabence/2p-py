@@ -1,7 +1,7 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: win-64
-@EXPLICIT
+# @EXPLICIT  # might need to comment out this
 https://repo.anaconda.com/pkgs/main/win-64/_tflow_select-2.3.0-eigen.conda
 https://repo.anaconda.com/pkgs/main/win-64/ca-certificates-2022.3.29-haa95532_0.conda
 https://conda.anaconda.org/conda-forge/win-64/intel-openmp-2022.0.0-h57928b3_3663.tar.bz2
