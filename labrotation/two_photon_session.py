@@ -12,7 +12,8 @@ import labrotation.nikon_ts_reader as ntsr
 # heuristic value, hopefully valid for all recordings made with the digitizer module
 LFP_SCALING_FACTOR = 1.0038
 
-
+# TODO IMPORTANT: use os.path for path-related manipulations instead of simple string indexing! (like in export_json)
+# TODO: make export_json more verbose! (print save directory and file name, for example)
 class TwoPhotonSession:
     # TODO: apparently, these are static variables... Bringing them inside __init__ is recommended.
     ND2_PATH: str = None  # TODO: no caps here!

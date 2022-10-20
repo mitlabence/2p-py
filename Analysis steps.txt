@@ -1,0 +1,2 @@
+1. process Nikon nd2 recording in Pure Python Pipeline
+2. if LFP available: Demo match LFP and Nikon. Extract belt data as well.
