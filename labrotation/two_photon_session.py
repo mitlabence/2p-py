@@ -16,11 +16,16 @@ import labrotation.nikon_ts_reader as ntsr
 
 # heuristic value, hopefully valid for all recordings made with the digitizer module
 LFP_SCALING_FACTOR = 1.0038
-DATETIME_FORMAT = "%Y.%m.%d-%H:%M:%S.%f"  # used for saving time stamps. See
+# used for saving time stamps. See
 # https://docs.python.org/3/library/datetime.html#strftime-strptime-behavior
 # for further information. %f is 0-padded microseconds to 6 digits.
+DATETIME_FORMAT = "%Y.%m.%d-%H:%M:%S.%f_%z"
 
-# TODO: fix save-open mismatch in lfp_t_start and nik_t_start, probably due to UTC setting differences
+
+# TODO: split up methods into more functions that are easily testable (like getting datetime format from string using
+#  DATETIME_FORMAT)
+#       and write tests. Example: test various datetime inputs for reading out from json (what if no timezone is
+#       supplied?)
 # TODO IMPORTANT: use os.path for path-related manipulations instead of simple string indexing! (like in export_json)
 # TODO: make export_json more verbose! (print save directory and file name, for example)
 # TODO: replace [:-4] or [:-*] with string manipulation
