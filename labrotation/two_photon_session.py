@@ -1,13 +1,12 @@
 import os
 from tkinter.filedialog import askopenfilename
-from typing import Optional
 
 import labrotation.belt_processing as belt_processing
 import pyabf as abf  # https://pypi.org/project/pyabf/
 import pims_nd2
 import pandas as pd
 import datetime
-import pytz  # for timezones
+import pytz  # timezones
 import numpy as np
 import warnings
 from copy import deepcopy
@@ -225,7 +224,7 @@ class TwoPhotonSession:
             except UnicodeDecodeError:
                 print(
                     "_open_data(): Timestamp file seems to be unusual. Trying to correct it.")
-                output_file_path = self.ND2_TIMESTAMPS_PATH[:-4] + "_corrected.txt"
+                output_file_path = os.path.splitext(self.ND2_TIMESTAMPS_PATH)[0] + "_corrected.txt"
                 ntsr.standardize_stamp_file(
                     self.ND2_TIMESTAMPS_PATH, output_file_path, export_encoding="utf_16_le")
                 self.nikon_meta = pd.read_csv(
@@ -468,7 +467,7 @@ class TwoPhotonSession:
 
                 belt_params (dict)
         """
-        fpath = kwargs.get("fpath", self.ND2_PATH[:-3] + "json")
+        fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".json")
 
         if self.belt_params is None:
             params = {}
@@ -509,7 +508,7 @@ def open_session(data_path: str) -> TwoPhotonSession:
     print(f"Selected imaging file: {nd2_path}")
 
     # nd2 info file (..._nik.txt) Image Proterties -> Recorded Data of .nd2 file saved as .txt
-    nd2_timestamps_path = nd2_path[:-4] + "_nik" + ".txt"
+    nd2_timestamps_path = os.path.splitext(nd2_path)[0] + "_nik.txt"
     if not os.path.exists(nd2_timestamps_path):
         nd2_timestamps_path = askopenfilename(initialdir=data_path,
                                               title="Nikon info file not found. Please provide it!")
@@ -521,8 +520,8 @@ def open_session(data_path: str) -> TwoPhotonSession:
     print(f"Selected LabView data file: {labview_path}")
 
     # labview time stamp (...time.txt)
-    labview_timestamps_path = labview_path[
-                              :-4] + "time" + ".txt"  # try to open the standard corresponding time stamp file first
+    labview_timestamps_path = \
+        os.path.splitext(labview_path)[0] + "time.txt"  # try to open the standard corresponding time stamp file first
     if not os.path.exists(labview_timestamps_path):
         labview_timestamps_path = askopenfilename(initialdir=data_path,
                                                   title="Labview time stamp not found. Please provide it!")
