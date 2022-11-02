@@ -1,0 +1,6 @@
+name: 2ppy
+channels:
+  - conda-forge
+  - menpo
+  - defaults
+prefix: D:\Software\anaconda\envs\2ppy\envs\2ppy
