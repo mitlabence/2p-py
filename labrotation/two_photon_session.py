@@ -13,6 +13,7 @@ from copy import deepcopy
 import json
 import labrotation.nikon_ts_reader as ntsr
 import h5py
+import warnings
 
 # heuristic value, hopefully valid for all recordings made with the digitizer module
 LFP_SCALING_FACTOR = 1.0038
@@ -186,6 +187,7 @@ class TwoPhotonSession:
         Re-instantiate a TwoPhotonSession from a saved json file.
         :return: A TwoPhotonSession object
         """
+        raise NotImplementedError("from_json() is deprecated and should not be used.")
         with open(fpath, "r") as json_file:
             json_dict = json.load(json_file)
             # get basic attributes
@@ -550,6 +552,7 @@ class TwoPhotonSession:
                 (belt_scn_df)
                 (nikon_daq_time)
         """
+        raise NotImplementedError("export_json() is deprecated and should not be used.")
         fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".json")
 
         if self.belt_params is None:
