@@ -12,6 +12,7 @@ import warnings
 from copy import deepcopy
 import json
 import labrotation.nikon_ts_reader as ntsr
+import h5py
 
 # heuristic value, hopefully valid for all recordings made with the digitizer module
 LFP_SCALING_FACTOR = 1.0038
@@ -21,13 +22,16 @@ LFP_SCALING_FACTOR = 1.0038
 DATETIME_FORMAT = "%Y.%m.%d-%H:%M:%S.%f_%z"
 
 
+# TODO: save to hd5 and open from hd5! Everything except the nikon movie could be saved (and the dataframes). Logic
+#       is that we would not need the files anymore, we could combine with caiman results. Or, if we want, we can open
+#       the nd2 file.
+# TODO: in init_and_process, make functions that convert belt_dict and belt_scn_dict from matlab data to numpy
+#       class methods that check if variable to convert is matlab array, if not, does nothing.
 # TODO: split up methods into more functions that are easily testable (like getting datetime format from string using
 #  DATETIME_FORMAT)
 #       and write tests. Example: test various datetime inputs for reading out from json (what if no timezone is
 #       supplied?)
-# TODO IMPORTANT: use os.path for path-related manipulations instead of simple string indexing! (like in export_json)
 # TODO: make export_json more verbose! (print save directory and file name, for example)
-# TODO: replace [:-4] or [:-*] with string manipulation
 # TODO: make _match_lfp_nikon_stamps to instead of returning time_offs_lfp_nik change self.time_offs_lfp_nik, like
 #       _create_nikon_daq_time. Anything against that?
 # TODO: also make sure that each function that infers internal parameters can be run several times and not mess
@@ -47,12 +51,12 @@ class TwoPhotonSession:
             LABVIEW_PATH: str
             LABVIEW_TIMESTAMPS_PATH: str
             LFP_PATH: str
-            MATLAB_2p_FOLDER: str
+            MATLAB_2P_FOLDER: str
 
         Implied (assigned using basic attributes)
             nikon_movie
             nikon_meta
-            lfp_file
+            lfp_file: pyabf.abf.ABF, the raw lfp data
             belt_dict
             belt_scn_dict
             belt_df
@@ -61,9 +65,9 @@ class TwoPhotonSession:
             lfp_df
             lfp_df_cut
             time_offs_lfp_nik
-            belt_params
-            lfp_t_start
-            nik_t_start
+            belt_params: dict
+            lfp_t_start: datetime.datetime
+            nik_t_start: datetime.datetime
             lfp_scaling: float = LFP_SCALING_FACTOR defined in __init__
     """
 
@@ -94,7 +98,7 @@ class TwoPhotonSession:
         self.LABVIEW_TIMESTAMPS_PATH = labview_timestamps_path
         self.LFP_PATH = lfp_path
         if matlab_2p_folder is not None:
-            self.MATLAB_2p_FOLDER = matlab_2p_folder
+            self.MATLAB_2P_FOLDER = matlab_2p_folder
         else:
             raise ModuleNotFoundError("matlab-2p path was not found")
         # set inferred attributes to default value
@@ -159,9 +163,14 @@ class TwoPhotonSession:
                        lfp_path=lfp_path,
                        matlab_2p_folder=matlab_2p_folder)
         instance._open_data()
-        for k, v in instance.belt_dict.items():  # convert matlab arrays into numpy arrays
+        # convert matlab arrays into numpy arrays
+        for k, v in instance.belt_dict.items():
             instance.belt_dict[k] = instance._matlab_array_to_numpy_array(
                 instance.belt_dict[k])
+        for k, v in instance.belt_scn_dict.items():
+            instance.belt_scn_dict[k] = instance._matlab_array_to_numpy_array(
+                instance.belt_scn_dict[k])
+
         instance._nikon_remove_na()
         instance._create_nikon_daq_time()  # defines self.nikon_daq_time
         instance._match_lfp_nikon_stamps()  # creates time_offs_lfp_nik
@@ -186,7 +195,7 @@ class TwoPhotonSession:
             labview_path = json_dict["LABVIEW_PATH"]
             labview_timestamps_path = json_dict["LABVIEW_TIMESTAMPS_PATH"]
             lfp_path = json_dict["LFP_PATH"]
-            matlab_2p_folder = json_dict["MATLAB_2p_FOLDER"]
+            matlab_2p_folder = json_dict["MATLAB_2P_FOLDER"]
         # optional inferred attributes are in json_dict, few of them need modification
         # lfp_t_start has in format .strftime("%Y.%m.%d-%H:%M:%S")
         json_dict["lfp_t_start"] = datetime.datetime.strptime(json_dict["lfp_t_start"], DATETIME_FORMAT)
@@ -196,12 +205,12 @@ class TwoPhotonSession:
         json_dict["time_offs_lfp_nik"] = float(json_dict["time_offs_lfp_nik"])
         # lfp_scaling is float, not str
         json_dict["lfp_scaling"] = float(json_dict["lfp_scaling"])
-        return cls(nd2_path=nd2_path,
-                   nd2_timestamps_path=nd2_timestamps_path,
-                   labview_path=labview_path,
-                   labview_timestamps_path=labview_timestamps_path,
-                   lfp_path=lfp_path,
-                   matlab_2p_folder=matlab_2p_folder, **json_dict)
+        instance = cls(nd2_path=nd2_path,
+                       nd2_timestamps_path=nd2_timestamps_path,
+                       labview_path=labview_path,
+                       labview_timestamps_path=labview_timestamps_path,
+                       lfp_path=lfp_path,
+                       matlab_2p_folder=matlab_2p_folder, **json_dict)
         # TODO: at this point, following not matching:
         #           nikon_movie: None
         #           lfp_file: None
@@ -212,6 +221,69 @@ class TwoPhotonSession:
         #               correct: 2021-12-02 10:05:39.204000+00:00, instead: 2021-12-02 10:05:39.204000
         #           nik_t_start: same as lfp_t_start
 
+    @classmethod
+    def from_hdf5(cls, fpath: str, try_open_files: bool = True):
+        # TODO: handle exceptions (missing data)
+
+        with h5py.File(fpath, "r") as hfile:
+            basic_attributes = dict()
+            for key, value in hfile["basic"].items():
+                basic_attributes[key] = value
+            instance = cls(nd2_path=basic_attributes["ND2_PATH"][()],
+                           nd2_timestamps_path=basic_attributes["ND2_TIMESTAMPS_PATH"][()],
+                           labview_path=basic_attributes["LABVIEW_PATH"][()],
+                           labview_timestamps_path=basic_attributes["LABVIEW_TIMESTAMPS_PATH"][()],
+                           lfp_path=basic_attributes["LFP_PATH"][()],
+                           matlab_2p_folder=basic_attributes["MATLAB_2P_FOLDER"][()])
+            # assign dictionary-type attributes
+            instance.belt_dict = dict()
+            instance.belt_scn_dict = dict()
+            instance.belt_params = dict()
+            for key, value in hfile["inferred"]["belt_dict"].items():
+                instance.belt_dict[key] = value[()]
+            for key, value in hfile["inferred"]["belt_scn_dict"].items():
+                instance.belt_scn_dict[key] = value[()]
+            for key, value in hfile["inferred"]["belt_params"].items():
+                instance.belt_params[key] = value[()]
+            # create dict for dataframes
+            nikon_meta_dict = dict()
+            for key, value in hfile["inferred"]["nikon_meta"].items():
+                nikon_meta_dict[key] = value[()]
+            belt_df_dict = dict()
+            for key, value in hfile["inferred"]["belt_df"].items():
+                belt_df_dict[key] = value[()]
+            belt_scn_df_dict = dict()
+            for key, value in hfile["inferred"]["belt_scn_df"].items():
+                belt_scn_df_dict[key] = value[()]
+            lfp_df_dict = dict()
+            for key, value in hfile["inferred"]["lfp_df"].items():
+                lfp_df_dict[key] = value[()]
+            lfp_df_cut_dict = dict()
+            for key, value in hfile["inferred"]["lfp_df_cut"].items():
+                lfp_df_cut_dict[key] = value[()]
+            instance.nikon_meta = pd.DataFrame.from_dict(nikon_meta_dict)
+            instance.belt_df = pd.DataFrame.from_dict(belt_df_dict)
+            instance.belt_scn_df = pd.DataFrame.from_dict(belt_scn_df_dict)
+            instance.lfp_df = pd.DataFrame.from_dict(lfp_df_dict)
+            instance.lfp_df_cut = pd.DataFrame.from_dict(lfp_df_cut_dict)
+
+            instance.nikon_daq_time = pd.Series(hfile["inferred"]["nikon_daq_time"][()])
+
+            instance.time_offs_lfp_nik = hfile["inferred"]["time_offs_lfp_nik"][()]
+            instance.lfp_t_start = datetime.datetime.strptime(hfile["inferred"]["lfp_t_start"][()], DATETIME_FORMAT)
+            instance.nik_t_start = datetime.datetime.strptime(hfile["inferred"]["nik_t_start"][()], DATETIME_FORMAT)
+            instance.lfp_scaling = hfile["inferred"]["lfp_scaling"][()]
+        if try_open_files:
+            try:
+                instance.nikon_movie = pims_nd2.ND2_Reader(instance.ND2_PATH)
+            except FileNotFoundError:
+                print(f"from_hdf5: nd2 file not found:\n\t{instance.ND2_PATH}. Skipping opening.")
+            try:
+                instance.lfp_file = abf.ABF(instance.LFP_PATH)
+            except FileNotFoundError:
+                print(f"from_hdf5: abf file not found:\n\t{instance.LFP_PATH}. Skipping opening.")
+        return instance
+
     def _open_data(self):
         if self.ND2_PATH is not None:
             self.nikon_movie = pims_nd2.ND2_Reader(self.ND2_PATH)
@@ -219,23 +291,34 @@ class TwoPhotonSession:
             #  take care of it?)
         if self.ND2_TIMESTAMPS_PATH is not None:
             try:
-                self.nikon_meta = pd.read_csv(
-                    self.ND2_TIMESTAMPS_PATH, delimiter="\t", encoding="utf_16_le")
+                self.nikon_meta = self.drop_nan_cols(
+                    pd.read_csv(
+                        self.ND2_TIMESTAMPS_PATH, delimiter="\t", encoding="utf_16_le"))
             except UnicodeDecodeError:
                 print(
                     "_open_data(): Timestamp file seems to be unusual. Trying to correct it.")
                 output_file_path = os.path.splitext(self.ND2_TIMESTAMPS_PATH)[0] + "_corrected.txt"
                 ntsr.standardize_stamp_file(
                     self.ND2_TIMESTAMPS_PATH, output_file_path, export_encoding="utf_16_le")
-                self.nikon_meta = pd.read_csv(
-                    output_file_path, delimiter="\t", encoding="utf_16_le")
+                self.nikon_meta = self.drop_nan_cols(
+                    pd.read_csv(
+                        output_file_path, delimiter="\t", encoding="utf_16_le"))
                 self.ND2_TIMESTAMPS_PATH = output_file_path
         if hasattr(self, "LABVIEW_PATH") and self.LABVIEW_PATH is not None:
             self.belt_dict, self.belt_scn_dict, self.belt_params = belt_processing.beltProcessPipelineExpProps(
-                self.LABVIEW_PATH, self.ND2_TIMESTAMPS_PATH, self.MATLAB_2p_FOLDER)
+                self.LABVIEW_PATH, self.ND2_TIMESTAMPS_PATH, self.MATLAB_2P_FOLDER)
+            # convert matlab.double() array to numpy array
+            self.belt_params["belt_length_mm"] = self._matlab_array_to_numpy_array(self.belt_params["belt_length_mm"])
         if hasattr(self, "LFP_PATH") and self.LFP_PATH is not None:
             self.lfp_file = abf.ABF(self.LFP_PATH)
             self.lfp_scaling = LFP_SCALING_FACTOR
+
+    def drop_nan_cols(self, dataframe: pd.DataFrame):
+        to_drop = []
+        for column in dataframe.columns:
+            if len(dataframe[column].dropna()) == 0:
+                to_drop.append(column)
+        return dataframe.drop(to_drop, axis='columns')
 
     def _matlab_array_to_numpy_array(self, matlab_array):
         return np.array(matlab_array._data)
@@ -447,25 +530,25 @@ class TwoPhotonSession:
                 self.LABVIEW_PATH
                 self.LABVIEW_TIMESTAMPS_PATH
                 self.LFP_PATH
-                self.MATLAB_2p_FOLDER
+                self.MATLAB_2P_FOLDER
             Inferred attributes:
-                (nikon_movie)
-                (nikon_meta)
-                (lfp_file)
-                (belt_dict)
-                (belt_scn_dict)
-                (belt_df)
-                (belt_scn_df)
-                (nikon_daq_time)
-                (lfp_df)
-                (lfp_df_cut)
+                self.belt_dict
+                self.belt_scn_dict
                 self.time_offs_lfp_nik
-                (belt_params)
                 self.lfp_t_start
                 self.nik_t_start
                 self.lfp_scaling
+                belt_params
 
-                belt_params (dict)
+            Not saved:
+                (lfp_file)
+                (nikon_movie)
+                (nikon_meta)
+                (lfp_df)
+                (lfp_df_cut)
+                (belt_df)
+                (belt_scn_df)
+                (nikon_daq_time)
         """
         fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".json")
 
@@ -480,7 +563,7 @@ class TwoPhotonSession:
         params["LABVIEW_PATH"] = self.LABVIEW_PATH
         params["LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH
         params["LFP_PATH"] = self.LFP_PATH
-        params["MATLAB_2p_FOLDER"] = self.MATLAB_2p_FOLDER
+        params["MATLAB_2P_FOLDER"] = self.MATLAB_2P_FOLDER
 
         params["time_offs_lfp_nik"] = self.time_offs_lfp_nik
         params["lfp_t_start"] = self.lfp_t_start.strftime(DATETIME_FORMAT)
@@ -494,6 +577,61 @@ class TwoPhotonSession:
         with open(fpath, "w") as f:
             json.dump(params, f, indent=4)
         print(f"Saved TwoPhotonSession instance to json file:\n\t{fpath}")
+
+    def export_hdf5(self, **kwargs) -> None:
+        # set export file name and path
+        fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".h5")
+        with h5py.File(fpath, "w") as hfile:
+            basic_group = hfile.create_group("basic")
+            # basic parameters
+            basic_group["ND2_PATH"] = self.ND2_PATH
+            basic_group["ND2_TIMESTAMPS_PATH"] = self.ND2_TIMESTAMPS_PATH
+            basic_group["LABVIEW_PATH"] = self.LABVIEW_PATH
+            basic_group["LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH
+            basic_group["LFP_PATH"] = self.LFP_PATH
+            basic_group["MATLAB_2P_FOLDER"] = self.MATLAB_2P_FOLDER
+            # implied parameters
+            inferred_group = hfile.create_group("inferred")
+            # save nikon_meta as group with columns as datasets
+            nikon_meta_group = inferred_group.create_group("nikon_meta")
+            for colname in self.nikon_meta.keys():
+                nikon_meta_group[colname] = self.nikon_meta[colname].to_numpy()
+            # save belt_dict
+            belt_dict_group = inferred_group.create_group("belt_dict")
+            for key, value in self.belt_dict.items():
+                belt_dict_group[key] = value
+            # save belt_scn_dict
+            belt_scn_dict_group = inferred_group.create_group("belt_scn_dict")
+            for key, value in self.belt_scn_dict.items():
+                belt_scn_dict_group[key] = value
+            # save pandas Series nikon_daq_time
+            inferred_group["nikon_daq_time"] = self.nikon_daq_time.to_numpy()
+            # save time_offs_lfp_nik
+            inferred_group["time_offs_lfp_nik"] = self.time_offs_lfp_nik
+            # save belt_params
+            belt_params_group = inferred_group.create_group("belt_params")
+            for key, value in self.belt_params.items():
+                belt_params_group[key] = value
+            # save lfp_t_start, nik_t_start, lfp_scaling
+            inferred_group["lfp_t_start"] = self.lfp_t_start.strftime(DATETIME_FORMAT)
+            inferred_group["nik_t_start"] = self.nik_t_start.strftime(DATETIME_FORMAT)
+            inferred_group["lfp_scaling"] = self.lfp_scaling
+            # save lfp_df
+            lfp_df_group = inferred_group.create_group("lfp_df")
+            for colname in self.lfp_df.keys():
+                lfp_df_group[colname] = self.lfp_df[colname].to_numpy()
+            # save lfp_df_cut
+            lfp_df_cut_group = inferred_group.create_group("lfp_df_cut")
+            for colname in self.lfp_df_cut.keys():
+                lfp_df_cut_group[colname] = self.lfp_df_cut[colname].to_numpy()
+            # save belt_df
+            belt_df_group = inferred_group.create_group("belt_df")
+            for colname in self.belt_df.keys():
+                belt_df_group[colname] = self.belt_df[colname].to_numpy()
+            # save belt_scn_df
+            belt_scn_df_group = inferred_group.create_group("belt_scn_df")
+            for colname in self.belt_scn_df.keys():
+                belt_scn_df_group[colname] = self.belt_scn_df[colname].to_numpy()
 
     # TODO: get nikon frame matching time stamps (NIDAQ time)! It is session.nikon_daq_time
     def return_nikon_mean(self):
