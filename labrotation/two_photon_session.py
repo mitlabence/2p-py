@@ -678,6 +678,7 @@ def open_session(data_path: str) -> TwoPhotonSession:
                                labview_timestamps_path=labview_timestamps_path, lfp_path=lfp_path)
     return session
 
+
 # TODO: extract these methods to a new python file, and move imports outside functions to speed up.
 # taken from caiman.utils.visualization.py
 def nb_view_patches_mod(Yr, A, C, b, f, d1, d2,
@@ -856,9 +857,23 @@ def nb_view_patches_mod(Yr, A, C, b, f, d1, d2,
         slider = bokeh.models.Slider(start=1, end=Y_r.shape[0], value=1, step=1,
                                      title="Neuron Number")
         slider.js_on_change('value', callback)
-        bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-            plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
-            bokeh.layouts.column(plot, plot_lfp, plot_mov))]]))
+        if y_mov is not None:
+            if y_lfp is not None:  # both lfp and mov
+                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
+                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
+                    bokeh.layouts.column(plot, plot_lfp, plot_mov))]]))
+            else:  # no lfp plot
+                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
+                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
+                    bokeh.layouts.column(plot, plot_mov))]]))
+        else:  # no mov plot
+            if y_lfp is not None:
+                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
+                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
+                    bokeh.layouts.column(plot, plot_lfp))]]))
+            else:  # no lfp and no movement
+                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
+                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2), plot)]]))
     else:
         bpl.show(bokeh.layouts.row(plot1 if r_values is None else
                                    bokeh.layouts.column(plot1, plot2), plot))
