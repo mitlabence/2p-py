@@ -1,0 +1,10 @@
+Make sure to install pip packages:
+pip install pims_nd2
+pip install pyabf
+
+OpenCV (ImportError: DLL load failed: The specified module could not be found.):
+pip install opencv-contrib-python (see https://stackoverflow.com/questions/43184887/dll-load-failed-error-when-importing-cv2)
+
+Make sure to install matlab engine:
+see Test Matlab Integration notebook
+
