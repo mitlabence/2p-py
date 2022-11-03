@@ -620,7 +620,7 @@ class TwoPhotonSession:
             # save lfp_t_start, nik_t_start, lfp_scaling
             inferred_group["lfp_t_start"] = self.lfp_t_start.strftime(DATETIME_FORMAT) if self.lfp_t_start is not None else ""
             inferred_group["nik_t_start"] = self.nik_t_start.strftime(DATETIME_FORMAT) if self.nik_t_start is not None else ""
-            inferred_group["lfp_scaling"] = self.lfp_scaling
+            inferred_group["lfp_scaling"] = self.lfp_scaling if self.lfp_scaling is not None else np.nan
             # save lfp_df
             lfp_df_group = inferred_group.create_group("lfp_df")
             if self.lfp_df is not None:
