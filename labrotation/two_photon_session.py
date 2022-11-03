@@ -582,6 +582,7 @@ class TwoPhotonSession:
             json.dump(params, f, indent=4)
         print(f"Saved TwoPhotonSession instance to json file:\n\t{fpath}")
 
+    # TODO: handle missing files
     def export_hdf5(self, **kwargs) -> None:
         # set export file name and path
         fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".h5")
@@ -592,7 +593,7 @@ class TwoPhotonSession:
             basic_group["ND2_TIMESTAMPS_PATH"] = self.ND2_TIMESTAMPS_PATH
             basic_group["LABVIEW_PATH"] = self.LABVIEW_PATH
             basic_group["LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH
-            basic_group["LFP_PATH"] = self.LFP_PATH
+            basic_group["LFP_PATH"] = self.LFP_PATH if self.LFP_PATH is not None else ""
             basic_group["MATLAB_2P_FOLDER"] = self.MATLAB_2P_FOLDER
             # implied parameters
             inferred_group = hfile.create_group("inferred")
@@ -611,31 +612,35 @@ class TwoPhotonSession:
             # save pandas Series nikon_daq_time
             inferred_group["nikon_daq_time"] = self.nikon_daq_time.to_numpy()
             # save time_offs_lfp_nik
-            inferred_group["time_offs_lfp_nik"] = self.time_offs_lfp_nik
+            inferred_group["time_offs_lfp_nik"] = self.time_offs_lfp_nik if self.time_offs_lfp_nik is not None else np.nan
             # save belt_params
             belt_params_group = inferred_group.create_group("belt_params")
             for key, value in self.belt_params.items():
                 belt_params_group[key] = value
             # save lfp_t_start, nik_t_start, lfp_scaling
-            inferred_group["lfp_t_start"] = self.lfp_t_start.strftime(DATETIME_FORMAT)
-            inferred_group["nik_t_start"] = self.nik_t_start.strftime(DATETIME_FORMAT)
+            inferred_group["lfp_t_start"] = self.lfp_t_start.strftime(DATETIME_FORMAT) if self.lfp_t_start is not None else ""
+            inferred_group["nik_t_start"] = self.nik_t_start.strftime(DATETIME_FORMAT) if self.nik_t_start is not None else ""
             inferred_group["lfp_scaling"] = self.lfp_scaling
             # save lfp_df
             lfp_df_group = inferred_group.create_group("lfp_df")
-            for colname in self.lfp_df.keys():
-                lfp_df_group[colname] = self.lfp_df[colname].to_numpy()
+            if self.lfp_df is not None:
+                for colname in self.lfp_df.keys():
+                    lfp_df_group[colname] = self.lfp_df[colname].to_numpy()
             # save lfp_df_cut
             lfp_df_cut_group = inferred_group.create_group("lfp_df_cut")
-            for colname in self.lfp_df_cut.keys():
-                lfp_df_cut_group[colname] = self.lfp_df_cut[colname].to_numpy()
+            if self.lfp_df_cut is not None:
+                for colname in self.lfp_df_cut.keys():
+                    lfp_df_cut_group[colname] = self.lfp_df_cut[colname].to_numpy()
             # save belt_df
             belt_df_group = inferred_group.create_group("belt_df")
-            for colname in self.belt_df.keys():
-                belt_df_group[colname] = self.belt_df[colname].to_numpy()
+            if self.belt_df is not None:
+                for colname in self.belt_df.keys():
+                    belt_df_group[colname] = self.belt_df[colname].to_numpy()
             # save belt_scn_df
             belt_scn_df_group = inferred_group.create_group("belt_scn_df")
-            for colname in self.belt_scn_df.keys():
-                belt_scn_df_group[colname] = self.belt_scn_df[colname].to_numpy()
+            if self.belt_scn_df is not None:
+                for colname in self.belt_scn_df.keys():
+                    belt_scn_df_group[colname] = self.belt_scn_df[colname].to_numpy()
 
     # TODO: get nikon frame matching time stamps (NIDAQ time)! It is session.nikon_daq_time
     def return_nikon_mean(self):
