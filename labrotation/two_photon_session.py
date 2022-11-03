@@ -683,7 +683,6 @@ def open_session(data_path: str) -> TwoPhotonSession:
 def nb_view_patches_mod(Yr, A, C, b, f, d1, d2,
                         t_lfp: np.array = None, y_lfp: np.array = None,
                         t_mov: np.array = None, y_mov: np.array = None,
-                        movement_corrected: np.array = None,
                         YrA=None, image_neurons=None, thr=0.99, denoised_color=None, cmap='jet',
                         r_values=None, SNR=None, cnn_preds=None):
     """
@@ -867,7 +866,6 @@ def nb_view_patches_mod(Yr, A, C, b, f, d1, d2,
     return Y_r
 
 
-# TODO: plot lfp and movement here as well.
 def nb_view_components_mod(estimates,
                            t_lfp: np.array = None, y_lfp: np.array = None,
                            t_mov: np.array = None, y_mov: np.array = None,
@@ -875,8 +873,15 @@ def nb_view_components_mod(estimates,
     """view spatial and temporal components interactively in a notebook
 
     Args:
-        estimates :
-
+        estimates : the estimates attribute of a CNMF instance
+        t_lfp: np.ndarray
+            time data of lfp recording
+        y_lfp: np.ndarray
+            amplitude of lfp recording
+        t_mov: np.ndarray
+            time data of movement recording
+        y_mov: np.ndarray
+            amplitude of movement recording
         Yr :    np.ndarray
             movie in format pixels (d) x frames (T)
 
