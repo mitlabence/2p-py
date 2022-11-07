@@ -26,7 +26,7 @@ def numpy_to_hdf5(numpy_data: ndarray, export_fpaths, start_end_frames: List[tup
         if isinstance(start_end_frames, list):
             if len(start_end_frames) == 0:
                 print(f"{FUNC_NAME}start_end_frames was provided, but it is an empty list. Exporting whole file.")
-                start_end_frames = [(0, len(numpy_data))]
+                start_end_frames = [(0, len(numpy_data) - 1)]
                 if export_fpaths.endswith(".hdf5"):
                     export_fpaths = [export_fpaths]
                 else:
