@@ -583,6 +583,7 @@ class TwoPhotonSession:
         print(f"Saved TwoPhotonSession instance to json file:\n\t{fpath}")
 
     # TODO: handle missing files
+    # FIXME: if lfp missing, no inferred group is created!
     def export_hdf5(self, **kwargs) -> None:
         # set export file name and path
         fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".h5")
