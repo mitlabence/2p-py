@@ -1,6 +1,10 @@
 import numpy as np
 import pims_nd2  # pip install pims_nd2
+
+
 # Comment for testing
+# TODO: move this function to a more general library. Possibly: combine with numpy to hdf5 function (
+#  movie_splitting.py), in a library called extension_manager, or io (combining with file_handling in this case)
 
 def np_arr_from_nd2(nd2_fpath: str):
     # set iter_axes to "t"
