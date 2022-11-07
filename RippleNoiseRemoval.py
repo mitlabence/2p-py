@@ -1,4 +1,3 @@
-import pims_nd2
 import numpy as np
 from matplotlib import pyplot as plt
 from nd2_to_caiman import np_arr_from_nd2
