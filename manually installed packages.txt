@@ -8,3 +8,4 @@ pip install pims_nd2
 
 Other:
 Install matlab engine for python. See Test Matlab Integration notebook.
+ffmpeg needs to be installed for exporting videos. (e. g. Play nd2 along LFP, movement.ipynb). conda install -c conda-forge ffmpeg

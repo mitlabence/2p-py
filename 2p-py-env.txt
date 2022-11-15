@@ -1,9 +1,9 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: win-64
-# @EXPLICIT  # might need to comment out this
+@EXPLICIT
 https://repo.anaconda.com/pkgs/main/win-64/_tflow_select-2.3.0-eigen.conda
-https://repo.anaconda.com/pkgs/main/win-64/ca-certificates-2022.3.29-haa95532_0.conda
+https://repo.anaconda.com/pkgs/main/win-64/ca-certificates-2022.10.11-haa95532_0.conda
 https://conda.anaconda.org/conda-forge/win-64/intel-openmp-2022.0.0-h57928b3_3663.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/msys2-conda-epoch-20160418-1.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/pandoc-2.17.0.1-h8ffe710_0.tar.bz2
@@ -38,7 +38,7 @@ https://conda.anaconda.org/conda-forge/win-64/libzopfli-1.0.3-h0e60522_0.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/lz4-c-1.9.3-h8ffe710_1.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/lzo-2.10-he774522_1000.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/m2w64-gcc-libgfortran-5.3.0-6.tar.bz2
-https://repo.anaconda.com/pkgs/main/win-64/openssl-1.1.1n-h2bbff1b_0.conda
+https://conda.anaconda.org/conda-forge/win-64/openssl-1.1.1q-h8ffe710_0.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/reproc-14.2.3-h8ffe710_0.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/snappy-1.1.8-ha925a31_3.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/sqlite-3.37.0-h8ffe710_0.tar.bz2
@@ -84,7 +84,6 @@ https://conda.anaconda.org/conda-forge/win-64/hdf5-1.10.6-nompi_h5268f04_1114.ta
 https://conda.anaconda.org/conda-forge/win-64/liblapacke-3.9.0-13_win64_mkl.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/libmamba-0.20.0-h44daa3b_0.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/menuinst-1.4.18-py38haa244fe_1.tar.bz2
-https://repo.anaconda.com/pkgs/main/win-64/certifi-2021.10.8-py38haa95532_2.conda
 https://repo.anaconda.com/pkgs/main/win-64/chardet-4.0.0-py38haa95532_1003.conda
 https://conda.anaconda.org/conda-forge/win-64/debugpy-1.5.1-py38h885f38d_0.tar.bz2
 https://repo.anaconda.com/pkgs/main/win-64/docutils-0.17.1-py38haa95532_1.conda
@@ -145,6 +144,7 @@ https://conda.anaconda.org/conda-forge/noarch/backports-1.0-py_2.tar.bz2
 https://conda.anaconda.org/conda-forge/noarch/backports.functools_lru_cache-1.6.4-pyhd8ed1ab_0.tar.bz2
 https://conda.anaconda.org/conda-forge/noarch/blinker-1.4-py_1.tar.bz2
 https://conda.anaconda.org/conda-forge/noarch/cachetools-4.2.4-pyhd8ed1ab_0.tar.bz2
+https://conda.anaconda.org/conda-forge/noarch/certifi-2022.9.24-pyhd8ed1ab_0.tar.bz2
 https://conda.anaconda.org/conda-forge/noarch/charset-normalizer-2.0.10-pyhd8ed1ab_0.tar.bz2
 https://conda.anaconda.org/conda-forge/noarch/cloudpickle-2.0.0-pyhd8ed1ab_0.tar.bz2
 https://conda.anaconda.org/conda-forge/noarch/colorama-0.4.4-pyh9f0ad1d_0.tar.bz2
