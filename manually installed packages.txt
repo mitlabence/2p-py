@@ -3,8 +3,8 @@ create a conda environment using 2p-py-env.txt. It will install almost all packa
 Set this to the project interpreter in PyCharm. It might still run the default anaconda interpreter, and throw errors while importing stuff. Set the correct interpeter in the project configurations!
 
 
-pip install pyabf
-pip install pims_nd2
+pip install pyabf  (2.3.7)
+pip install pims_nd2  (1.1)
 
 Other:
 Install matlab engine for python. See Test Matlab Integration notebook.
