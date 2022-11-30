@@ -44,6 +44,8 @@ DATETIME_FORMAT = "%Y.%m.%d-%H:%M:%S.%f_%z"
 #       and what attributes it changes/sets!
 # TODO: add test that attributes of twophotonsession opened from json results file match those of using init or
 #       init_and_process
+# TODO: implement verbose flag to show/hide print() comments.
+
 class TwoPhotonSession:
     """
     Attributes:
@@ -119,6 +121,7 @@ class TwoPhotonSession:
         self.lfp_t_start = None
         self.nik_t_start = None
         self.lfp_scaling = None
+        self.verbose = True  # printing some extra text by default
 
         # check for optionally supported keyword arguments:
         self._assign_from_kwargs("nikon_movie", kwargs)
@@ -136,6 +139,7 @@ class TwoPhotonSession:
         self._assign_from_kwargs("lfp_t_start", kwargs)
         self._assign_from_kwargs("nik_t_start", kwargs)
         self._assign_from_kwargs("lfp_scaling", kwargs)
+        self._assign_from_kwargs("verbose", kwargs)
 
     def _assign_from_kwargs(self, attribute_name: str, kwargs_dict: dict):
         if attribute_name in kwargs_dict.keys():
@@ -310,6 +314,17 @@ class TwoPhotonSession:
         if hasattr(self, "LABVIEW_PATH") and self.LABVIEW_PATH is not None:
             self.belt_dict, self.belt_scn_dict, self.belt_params = belt_processing.beltProcessPipelineExpProps(
                 self.LABVIEW_PATH, self.ND2_TIMESTAMPS_PATH, self.MATLAB_2P_FOLDER)
+
+            for key in self.belt_dict.keys():
+                try:
+                    self.belt_dict[key] = self._matlab_array_to_numpy_array(self.belt_dict[key])
+                finally:
+                    print("Warning: belt_dict could not be mapped from matlab to python datatype!")
+            for key in self.belt_scn_dict.keys():
+                try:
+                    self.belt_scn_dict[key] = self._matlab_array_to_numpy_array(self.belt_scn_dict[key])
+                finally:
+                    print("Warning: belt_scn_dict could not be mapped from matlab to python datatype!")
             # convert matlab.double() array to numpy array
             try:
                 self.belt_params["belt_length_mm"] = self._matlab_array_to_numpy_array(
