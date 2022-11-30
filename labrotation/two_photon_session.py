@@ -287,7 +287,7 @@ class TwoPhotonSession:
                 print(f"from_hdf5: abf file not found:\n\t{instance.LFP_PATH}. Skipping opening.")
         return instance
 
-    def _open_data(self):
+    def _open_data(self):  # TODO: rename this, as this does not only open data, but also processes some data.
         if self.ND2_PATH is not None:
             self.nikon_movie = pims_nd2.ND2_Reader(self.ND2_PATH)
             # TODO: nikon_movie should be closed properly upon removing this class (or does the garbage collector
@@ -311,7 +311,13 @@ class TwoPhotonSession:
             self.belt_dict, self.belt_scn_dict, self.belt_params = belt_processing.beltProcessPipelineExpProps(
                 self.LABVIEW_PATH, self.ND2_TIMESTAMPS_PATH, self.MATLAB_2P_FOLDER)
             # convert matlab.double() array to numpy array
-            self.belt_params["belt_length_mm"] = self._matlab_array_to_numpy_array(self.belt_params["belt_length_mm"])
+            try:
+                self.belt_params["belt_length_mm"] = self._matlab_array_to_numpy_array(
+                    self.belt_params["belt_length_mm"])
+            except AttributeError:
+                print(
+                    f"No conversion of belt_length_mm happened, as belt_params['belt_length_mm'] is type "
+                    f"{type(self.belt_params['belt_length_mm'])}")
         if hasattr(self, "LFP_PATH") and self.LFP_PATH is not None:
             self.lfp_file = abf.ABF(self.LFP_PATH)
             self.lfp_scaling = LFP_SCALING_FACTOR
