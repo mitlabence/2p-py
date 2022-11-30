@@ -613,14 +613,17 @@ class TwoPhotonSession:
             # save pandas Series nikon_daq_time
             inferred_group["nikon_daq_time"] = self.nikon_daq_time.to_numpy()
             # save time_offs_lfp_nik
-            inferred_group["time_offs_lfp_nik"] = self.time_offs_lfp_nik if self.time_offs_lfp_nik is not None else np.nan
+            inferred_group[
+                "time_offs_lfp_nik"] = self.time_offs_lfp_nik if self.time_offs_lfp_nik is not None else np.nan
             # save belt_params
             belt_params_group = inferred_group.create_group("belt_params")
             for key, value in self.belt_params.items():
                 belt_params_group[key] = value
             # save lfp_t_start, nik_t_start, lfp_scaling
-            inferred_group["lfp_t_start"] = self.lfp_t_start.strftime(DATETIME_FORMAT) if self.lfp_t_start is not None else ""
-            inferred_group["nik_t_start"] = self.nik_t_start.strftime(DATETIME_FORMAT) if self.nik_t_start is not None else ""
+            inferred_group["lfp_t_start"] = self.lfp_t_start.strftime(
+                DATETIME_FORMAT) if self.lfp_t_start is not None else ""
+            inferred_group["nik_t_start"] = self.nik_t_start.strftime(
+                DATETIME_FORMAT) if self.nik_t_start is not None else ""
             inferred_group["lfp_scaling"] = self.lfp_scaling if self.lfp_scaling is not None else np.nan
             # save lfp_df
             lfp_df_group = inferred_group.create_group("lfp_df")
@@ -646,6 +649,26 @@ class TwoPhotonSession:
     # TODO: get nikon frame matching time stamps (NIDAQ time)! It is session.nikon_daq_time
     def return_nikon_mean(self):
         return [self.nikon_movie[i_frame].mean() for i_frame in range(self.nikon_movie.sizes["t"])]
+
+    def infer_labview_timestamps(self):
+        """
+        Try to infer the labview time stamps filename given the labview filename.
+        :return: None
+        """
+        if self.LABVIEW_PATH is not None:
+            inferred_fpath = os.path.splitext(self.LABVIEW_PATH)[0] + "time.txt"
+            if os.path.exists(inferred_fpath):
+                if self.LABVIEW_TIMESTAMPS_PATH is None:
+                    self.LABVIEW_TIMESTAMPS_PATH = inferred_fpath
+                    print(f"Inferred labview timestamps file path:\n\t{self.LABVIEW_TIMESTAMPS_PATH}")
+                else:  # timestamps file already defined
+                    print(
+                        f"Labview timestamps file seems to already exist:\n\t{self.LABVIEW_TIMESTAMPS_PATH}\nNOT "
+                        f"changing it.")
+        else:
+            print(
+                "Can not infer labview timestamps filename, as no labview data was defined. (txt file with labview "
+                "readout data)")
 
 
 def open_session(data_path: str) -> TwoPhotonSession:
