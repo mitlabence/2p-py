@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from nd2_to_caiman import np_arr_from_nd2
-
+from typing import Tuple
 """
 # optional: show original figure of which plot is made
 fig = plt.figure(figsize=(18,18))
@@ -28,8 +28,8 @@ class RNR():
         self.n_threads = n_threads
         # assert(self.n_threads <= cpu_count())
 
-    def open_recording(self, nd2_fpath):
-        self.nd2_data = np_arr_from_nd2(nd2_fpath)
+    def open_recording(self, nd2_fpath, begin_end_frames: Tuple[int, int]=None):
+        self.nd2_data = np_arr_from_nd2(nd2_fpath, begin_end_frames)
         self.rnr_data = np.empty(self.nd2_data.shape, dtype=np.float64)
         self.n_frames = self.nd2_data.shape[0]
         self.end_x = self.nd2_data.shape[1]
