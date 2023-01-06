@@ -318,12 +318,12 @@ class TwoPhotonSession:
             for key in self.belt_dict.keys():
                 try:
                     self.belt_dict[key] = self._matlab_array_to_numpy_array(self.belt_dict[key])
-                finally:
+                except Error:
                     print("Warning: belt_dict could not be mapped from matlab to python datatype!")
             for key in self.belt_scn_dict.keys():
                 try:
                     self.belt_scn_dict[key] = self._matlab_array_to_numpy_array(self.belt_scn_dict[key])
-                finally:
+                except Error:
                     print("Warning: belt_scn_dict could not be mapped from matlab to python datatype!")
             # convert matlab.double() array to numpy array
             try:
