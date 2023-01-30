@@ -1,11 +1,18 @@
+import logging
 import os
 
+import caiman
 import h5py
+from caiman.mmapping import prepare_shape
 from numpy import float64, ndarray
-from typing import List
+from typing import List, Optional
+import numpy as np
 
 
-def numpy_to_hdf5(numpy_data: ndarray, export_fpaths, start_end_frames: List[tuple] = None, dataset_name: str = "mov"):
+def numpy_to_hdf5(numpy_data: ndarray,
+                  export_fpaths,
+                  start_end_frames: List[tuple] = None,
+                  dataset_name: str = "mov") -> List[str]:
     """
     :param numpy_data: numpy.ndarray. First dimension should be number of frames, e.g. shape should be
     (10000, 512, 512) for an512x512 video of 10000 frames.
@@ -18,7 +25,7 @@ def numpy_to_hdf5(numpy_data: ndarray, export_fpaths, start_end_frames: List[tup
             with the frames 0 to 1000 (including frame 1000, which is the 1001st frame of the video) included.
     :param dataset_name: name of the dataset in the resulting hdf5 file. CaImAn by default uses 'mov', also the default
             in this function. See also 'var_name_hdf5' in various CaImAn functions.
-    :return:
+    :return: The list of created files as a list of string (full path with filename and extension)
     """
     FUNC_NAME = "numpy_to_hdf5: "
     if isinstance(export_fpaths, str):  # need to check whether to create multiple file names from single given
@@ -88,3 +95,27 @@ def numpy_to_hdf5(numpy_data: ndarray, export_fpaths, start_end_frames: List[tup
                 dataset[i_frame_counter] = numpy_data[i_frame]
                 i_frame_counter += 1
     print("Done.")
+    return export_fpaths
+
+
+# TODO: function taken from motion_correction.py, motion_correction_piecewise(). It should be used to create memmap.
+def save_memmap_without_moco(base_name=None,
+                             fname=None,
+                             order='F',
+                             var_name_hdf5='mov',
+                             indices=(slice(None), slice(None))):
+    if base_name is None:
+        base_name = os.path.split(fname)[1][:-4]
+    dims, T = caiman.source_extraction.cnmf.utilities.get_file_size(fname, var_name_hdf5=var_name_hdf5)
+    z = np.zeros(dims)
+    dims = z[indices].shape
+    shape_mov = (np.prod(dims), T)
+    fname_tot: Optional[str] = caiman.paths.memmap_frames_filename(base_name, dims, T, order)
+    if isinstance(fname, tuple):
+        fname_tot = os.path.join(os.path.split(fname[0])[0], fname_tot)
+    else:
+        fname_tot = os.path.join(os.path.split(fname)[0], fname_tot)
+
+    np.memmap(fname_tot, mode='w+', dtype=np.float32,
+              shape=prepare_shape(shape_mov), order=order)
+    logging.info('Saving no-moco file as {}'.format(fname_tot))
