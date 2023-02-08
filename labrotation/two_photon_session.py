@@ -345,7 +345,10 @@ class TwoPhotonSession:
         return dataframe.drop(to_drop, axis='columns')
 
     def _matlab_array_to_numpy_array(self, matlab_array):
-        return np.array(matlab_array._data)
+        if type(matlab_array) is np.ndarray:
+            return matlab_array
+        else:
+            return np.array(matlab_array._data)
 
     def _nikon_remove_na(self):
         # get the stimulation metadata frames
@@ -732,10 +735,10 @@ def open_session(data_path: str) -> TwoPhotonSession:
 # TODO: extract these methods to a new python file, and move imports outside functions to speed up.
 # taken from caiman.utils.visualization.py
 def nb_view_patches_with_lfp_movement(Yr, A, C, b, f, d1, d2,
-                        t_lfp: np.array = None, y_lfp: np.array = None,
-                        t_mov: np.array = None, y_mov: np.array = None,
-                        YrA=None, image_neurons=None, thr=0.99, denoised_color=None, cmap='jet',
-                        r_values=None, SNR=None, cnn_preds=None):
+                                      t_lfp: np.array = None, y_lfp: np.array = None,
+                                      t_mov: np.array = None, y_mov: np.array = None,
+                                      YrA=None, image_neurons=None, thr=0.99, denoised_color=None, cmap='jet',
+                                      r_values=None, SNR=None, cnn_preds=None):
     """
     Interactive plotting utility for ipython notebook
 
@@ -930,12 +933,12 @@ def nb_view_patches_with_lfp_movement(Yr, A, C, b, f, d1, d2,
 
     return Y_r
 
-	
-	# TODO: extract these methods to a new python file, and move imports outside functions to speed up.
+
+# TODO: extract these methods to a new python file, and move imports outside functions to speed up.
 # taken from caiman.utils.visualization.py
 def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
-                        YrA=None, image_neurons=None, thr=0.99, denoised_color=None, cmap='jet',
-                        r_values=None, SNR=None, cnn_preds=None):
+                                   YrA=None, image_neurons=None, thr=0.99, denoised_color=None, cmap='jet',
+                                   r_values=None, SNR=None, cnn_preds=None):
     """
     Interactive plotting utility for ipython notebook
 
@@ -974,8 +977,17 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
         import bokeh
         import bokeh.plotting as bpl
         from bokeh.models import CustomJS, ColumnDataSource, Range1d, LabelSet
+        from bokeh.models.widgets.buttons import Button, Toggle
     except:
         print("Bokeh could not be loaded. Either it is not installed or you are not running within a notebook")
+
+    # TODO: idx_components and idx_components_bad refer to indices of accepted/rejected neurons, use these in
+    #  nb_view_components_manual_control. If These don't exist, that means select_components has been called... I don't
+    #  know if it is still possible (easily) to move the neurons from one group to the other.
+    REJECTED_COLOR = "red"
+    REJECTED_TEXT = "rejected"
+    ACCEPTED_COLOR = "green"
+    ACCEPTED_TEXT = "accepted"
 
     colormap = mpl.cm.get_cmap(cmap)
     grayp = [mpl.colors.rgb2hex(m) for m in colormap(np.arange(colormap.N))]
@@ -1086,38 +1098,36 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
                 y=image_neurons.shape[0], dw=d2, dh=d1, palette=grayp)
     plot1.patch('c1', 'c2', alpha=0.6, color='purple',
                 line_width=2, source=source2)
+
+    original_status = Button(label="original: " + ACCEPTED_TEXT, disabled=True, width=150, background=ACCEPTED_COLOR)
+    current_status = Button(label="current: " + REJECTED_TEXT, disabled=True, width=150, background=REJECTED_COLOR)
+    transfer_button = Button(label="Transfer", width=100)
+    save_button = Button(label="Save changes", width=100)
     if Y_r.shape[0] > 1:
         slider = bokeh.models.Slider(start=1, end=Y_r.shape[0], value=1, step=1,
                                      title="Neuron Number")
         slider.js_on_change('value', callback)
-        if y_mov is not None:
-            if y_lfp is not None:  # both lfp and mov
-                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
-                    bokeh.layouts.column(plot, plot_lfp, plot_mov))]]))
-            else:  # no lfp plot
-                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
-                    bokeh.layouts.column(plot, plot_mov))]]))
-        else:  # no mov plot
-            if y_lfp is not None:
-                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
-                    bokeh.layouts.column(plot, plot_lfp))]]))
-            else:  # no lfp and no movement
-                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2), plot)]]))
+        bpl.show(bokeh.layouts.layout([[slider, transfer_button, original_status, current_status], [bokeh.layouts.row(
+            plot1 if r_values is None else bokeh.layouts.column(plot1, plot2), plot)]]))
     else:
         bpl.show(bokeh.layouts.row(plot1 if r_values is None else
                                    bokeh.layouts.column(plot1, plot2), plot))
+    # TODO: using slider should emit changes to original_status and current_status. Use subscribed_events
+    # TODO: also pressing transfer should update current_status.
+    # ButtonClick as event (for transfering)
 
+    # TODO: on clicking Transfer, print something; then print current slider value
+    # TODO: apparently, changing the python variables directly is not possible. Can create a JS variable initially, a
+    #  list of accepted/rejected. Create two of these, one for original status, the other vill be modified (current
+    #  status). Pressing Transfer changes the current status. Upon clicking on another button, export the old and
+    #  current status lists into python variables, then do the conversion in python."
     return Y_r
-	
+
 
 def nb_view_components_with_lfp_movement(estimates,
-                           t_lfp: np.array = None, y_lfp: np.array = None,
-                           t_mov: np.array = None, y_mov: np.array = None,
-                           Yr=None, img=None, idx=None, denoised_color=None, cmap='jet', thr=0.99):
+                                         t_lfp: np.array = None, y_lfp: np.array = None,
+                                         t_mov: np.array = None, y_mov: np.array = None,
+                                         Yr=None, img=None, idx=None, denoised_color=None, cmap='jet', thr=0.99):
     """view spatial and temporal components interactively in a notebook, along with LFP and movement
 
     Args:
@@ -1188,7 +1198,8 @@ def nb_view_components_with_lfp_movement(estimates,
 
 
 def nb_view_components_manual_control(estimates,
-                           Yr=None, img=None, idx=None, denoised_color=None, cmap='jet', thr=0.99, mode:str="reject"):
+                                      Yr=None, img=None, idx=None, denoised_color=None, cmap='jet', thr=0.99,
+                                      mode: str = "reject"):
     """view spatial and temporal components interactively in a notebook
 
     Args:
@@ -1220,13 +1231,14 @@ def nb_view_components_manual_control(estimates,
         cmap: string
             name of colormap (e.g. 'viridis') used to plot image_neurons
             :param estimates:
-		
+
 		mode: string
 			Whether to go through accepted components and reject manually ("accepted" or reject"), or go through rejected components and move manually to accepted ("rejected" or "accept").
     """
     from matplotlib import pyplot as plt
     import scipy
-
+    # TODO: if refit is used, estimates.idx_components and idx_components_bad are empty (None). Need to still plot
+    #  these as all accepted
     if 'csc_matrix' not in str(type(estimates.A)):
         estimates.A = scipy.sparse.csc_matrix(estimates.A)
 
