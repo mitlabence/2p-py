@@ -27,6 +27,8 @@ def numpy_to_hdf5(numpy_data: ndarray,
             in this function. See also 'var_name_hdf5' in various CaImAn functions.
     :return: The list of created files as a list of string (full path with filename and extension)
     """
+    # TODO: if export_fpaths lists one or more .h5 files, switch the extension to hdf5 instead of creating a file like
+    #  xy.h5.hdf5
     FUNC_NAME = "numpy_to_hdf5: "
     if isinstance(export_fpaths, str):  # need to check whether to create multiple file names from single given
         print(f"{FUNC_NAME}Single output filename detected.")
