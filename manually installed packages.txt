@@ -9,3 +9,9 @@ pip install pims_nd2  (1.1)
 Other:
 Install matlab engine for python. See Test Matlab Integration notebook.
 ffmpeg needs to be installed for exporting videos. (e. g. Play nd2 along LFP, movement.ipynb). conda install -c conda-forge ffmpeg
+	This is only the python package, though. Need to install the appropriate version from here: https://ffmpeg.org/download.html
+	One version that worked was: ffmpeg version 4.3.2-2021-02-20-full_build-www.gyan.dev. I.e. full build built by gyan should work. Download the 7z file, 
+	use 7-zip to extract it to an appropriate place (like C:\\ffmpeg. Warning: if extracted in Program Files, there will be a lot of issues with permissions!
+	Even extracting there does not work easily). Then add the bin folder to the Path environmental variable (Edit the system environment variables). 
+	Need to restart the prompt (Anaconda prompt) afterwards! Run ffmpeg and see if it works. If yes, ffmpeg should be installed. 
+	Test the python library too (import ffmpeg) before using it.
