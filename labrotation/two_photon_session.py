@@ -15,6 +15,7 @@ import json
 import labrotation.nikon_ts_reader as ntsr
 import h5py
 import warnings
+from typing import List
 
 # heuristic value, hopefully valid for all recordings made with the digitizer module
 LFP_SCALING_FACTOR = 1.0038
@@ -776,7 +777,8 @@ def nb_view_patches_with_lfp_movement(Yr, A, C, b, f, d1, d2,
     try:
         import bokeh
         import bokeh.plotting as bpl
-        from bokeh.models import CustomJS, ColumnDataSource, Range1d, LabelSet
+        from bokeh.models import CustomJS, ColumnDataSource, Range1d, LabelSet, Slider
+        from bokeh.layouts import layout, row, column
     except:
         print("Bokeh could not be loaded. Either it is not installed or you are not running within a notebook")
 
@@ -907,29 +909,29 @@ def nb_view_patches_with_lfp_movement(Yr, A, C, b, f, d1, d2,
                               plot_height=plot.plot_height)
         plot_mov.line("x", "y", source=source_mov)
     if Y_r.shape[0] > 1:
-        slider = bokeh.models.Slider(start=1, end=Y_r.shape[0], value=1, step=1,
-                                     title="Neuron Number")
+        slider = Slider(start=1, end=Y_r.shape[0], value=1, step=1,
+                        title="Neuron Number")
         slider.js_on_change('value', callback)
         if y_mov is not None:
             if y_lfp is not None:  # both lfp and mov
-                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
-                    bokeh.layouts.column(plot, plot_lfp, plot_mov))]]))
+                bpl.show(layout([[slider], [row(
+                    plot1 if r_values is None else column(plot1, plot2),
+                    column(plot, plot_lfp, plot_mov))]]))
             else:  # no lfp plot
-                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
-                    bokeh.layouts.column(plot, plot_mov))]]))
+                bpl.show(layout([[slider], [row(
+                    plot1 if r_values is None else column(plot1, plot2),
+                    column(plot, plot_mov))]]))
         else:  # no mov plot
             if y_lfp is not None:
-                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2),
-                    bokeh.layouts.column(plot, plot_lfp))]]))
+                bpl.show(layout([[slider], [row(
+                    plot1 if r_values is None else column(plot1, plot2),
+                    column(plot, plot_lfp))]]))
             else:  # no lfp and no movement
-                bpl.show(bokeh.layouts.layout([[slider], [bokeh.layouts.row(
-                    plot1 if r_values is None else bokeh.layouts.column(plot1, plot2), plot)]]))
+                bpl.show(layout([[slider], [row(
+                    plot1 if r_values is None else column(plot1, plot2), plot)]]))
     else:
-        bpl.show(bokeh.layouts.row(plot1 if r_values is None else
-                                   bokeh.layouts.column(plot1, plot2), plot))
+        bpl.show(row(plot1 if r_values is None else
+                     column(plot1, plot2), plot))
 
     return Y_r
 
@@ -938,7 +940,8 @@ def nb_view_patches_with_lfp_movement(Yr, A, C, b, f, d1, d2,
 # taken from caiman.utils.visualization.py
 def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
                                    YrA=None, image_neurons=None, thr=0.99, denoised_color=None, cmap='jet',
-                                   r_values=None, SNR=None, cnn_preds=None):
+                                   r_values=None, SNR=None, cnn_preds=None, mode: str = None, idx_accepted: List = None,
+                                   idx_rejected: List = None):
     """
     Interactive plotting utility for ipython notebook
 
@@ -968,44 +971,79 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
         cmap: string
             name of colormap (e.g. 'viridis') used to plot image_neurons
             :param r_values:
+
+        mode: string
+            The initial view mode to show. It should be one of 'accepted', 'rejected', 'all'. The fourth option,
+            'modified', would cause an empty plot.
+
+        idx_accepted: List
+            The idx_components field of the estimates object.
+
+        idx_rejected: List
+            The idx_components_bad field of the estimates object.
     """
     from past.utils import old_div
     import matplotlib as mpl
     from scipy.sparse import spdiags
     from caiman.utils.visualization import get_contours
+    from labrotation.file_handling import get_filename_with_date
     try:
         import bokeh
         import bokeh.plotting as bpl
-        from bokeh.models import CustomJS, ColumnDataSource, Range1d, LabelSet
+        from bokeh.models import CustomJS, ColumnDataSource, Range1d, LabelSet, Dropdown, Slider
         from bokeh.models.widgets.buttons import Button, Toggle
+        from bokeh.layouts import layout, row, column
     except:
         print("Bokeh could not be loaded. Either it is not installed or you are not running within a notebook")
-
     # TODO: idx_components and idx_components_bad refer to indices of accepted/rejected neurons, use these in
     #  nb_view_components_manual_control. If These don't exist, that means select_components has been called... I don't
     #  know if it is still possible (easily) to move the neurons from one group to the other.
-    REJECTED_COLOR = "red"
-    REJECTED_TEXT = "rejected"
-    ACCEPTED_COLOR = "green"
-    ACCEPTED_TEXT = "accepted"
+
+    """
+        nb_view_patches_manual_control(
+        Yr, estimates.A.tocsc()[:, idx], estimates.C[idx], estimates.b, estimates.f,
+        estimates.dims[0], estimates.dims[1],
+        YrA=estimates.R[idx], image_neurons=img,
+        thr=thr, denoised_color=denoised_color, cmap=cmap,
+        r_values=None if estimates.r_values is None else estimates.r_values[idx],
+        SNR=None if estimates.SNR_comp is None else estimates.SNR_comp[idx],
+        cnn_preds=None if np.sum(estimates.cnn_preds) in (0, None) else estimates.cnn_preds[idx],
+        mode=mode)
+    """
+
+    # No easy way to use these in CustomJS. Could define beginning of variable 'code' like this, and append the rest
+    # REJECTED_COLOR = "red"
+    # REJECTED_TEXT = "rejected"
+    # ACCEPTED_COLOR = "green"
+    # ACCEPTED_TEXT = "accepted"
+
+    # idx_accepted and idx_rejected should be disjoint lists coming from CaImAn. (0-indexing)
+    # set to 1 all the entries that correspond to accepted components. Rest is 0.
+    cell_category_original = [0 for i in range(len(idx_accepted) + len(idx_rejected))]
+    for i_accepted in idx_accepted:
+        cell_category_original[i_accepted] = 1
+    cell_category_new = cell_category_original.copy()
 
     colormap = mpl.cm.get_cmap(cmap)
     grayp = [mpl.colors.rgb2hex(m) for m in colormap(np.arange(colormap.N))]
     nr, T = C.shape
+
     nA2 = np.ravel(np.power(A, 2).sum(0)) if isinstance(A, np.ndarray) else np.ravel(A.power(2).sum(0))
     b = np.squeeze(b)
     f = np.squeeze(f)
     if YrA is None:
-        Y_r = np.array(spdiags(old_div(1, nA2), 0, nr, nr) *
-                       (A.T * np.matrix(Yr) -
-                        (A.T * np.matrix(b[:, np.newaxis])) * np.matrix(f[np.newaxis]) -
-                        A.T.dot(A) * np.matrix(C)) + C)
+        # Y_r = np.array(spdiags(old_div(1, nA2), 0, nr, nr) *
+        #               (A.T * np.matrix(Yr) -
+        #                (A.T * np.matrix(b[:, np.newaxis])) * np.matrix(f[np.newaxis]) -
+        #                A.T.dot(A) * np.matrix(C)) + C)
+        raise NotImplementedError("YrA is None; this has not been implemented yet")
     else:
         Y_r = C + YrA
 
     x = np.arange(T)
     if image_neurons is None:
-        image_neurons = A.mean(1).reshape((d1, d2), order='F')
+        raise NotImplementedError("image_neurons is None; this has not been implemented yet")
+        # image_neurons = A.mean(1).reshape((d1, d2), order='F')
 
     coors = get_contours(A, (d1, d2), thr)
     cc1 = [cor['coordinates'][:, 0] for cor in coors]
@@ -1015,23 +1053,36 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
 
     # split sources up, such that Bokeh does not warn
     # "ColumnDataSource's columns must be of the same length"
-    source = ColumnDataSource(data=dict(x=x, y=Y_r[0] / 100, y2=C[0] / 100))
-    source_ = ColumnDataSource(data=dict(z=Y_r / 100, z2=C / 100))
+    source = ColumnDataSource(data=dict(x=x, y=Y_r[0] / 100, y2=C[0] / 100))  # contains traces of single neuron
+    source_ = ColumnDataSource(data=dict(z=Y_r / 100, z2=C / 100))  # contains all traces; use this to update source
     source2 = ColumnDataSource(data=dict(c1=c1, c2=c2))
     source2_ = ColumnDataSource(data=dict(cc1=cc1, cc2=cc2))
-
+    categories = ColumnDataSource(data=dict(cats=cell_category_original))
+    categories_new = ColumnDataSource(data=dict(cats=cell_category_new))
+    # TODO: create list that contains the neurons the slide can go over, mapping slider index (1 to N) to neuron index
+    #       in source.  Depending on dropdown setting, re-make this list to include only accepted, only rejected, all,
+    #       or modified-only components.
+    neurons_to_show = ColumnDataSource(data=dict(idx=[i for i in range(len(cell_category_original))]))
+    print(len(categories.data['cats']))
+    print(len(categories_new.data['cats']))
+    print(len(neurons_to_show.data['idx']))
     code = """
+            console.log("Very first line of JS");
             var data = source.data
             var data_ = source_.data
-            var f = cb_obj.value - 1
+            var indices = neurons_to_show.data['idx'];  // map neuron indices (in source) to slider values
+            var f = cb_obj.value - 1  // slider value. (converted to 0-indexing)
             var x = data['x']
             var y = data['y']
             var y2 = data['y2']
-
+            // update source (i.e. single neuron trace) to the currently selected neuron
             for (var i = 0; i < x.length; i++) {
-                y[i] = data_['z'][i+f*x.length]
-                y2[i] = data_['z2'][i+f*x.length]
+                y[i] = data_['z'][i+indices[f]*x.length]
+                y2[i] = data_['z2'][i+indices[f]*x.length]
             }
+            // update category
+            var cats = categories.data["cats"];
+            var cats_new = categories_new.data["cats"];
 
             var data2_ = source2_.data;
             var data2 = source2.data;
@@ -1039,10 +1090,30 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
             var c2 = data2['c2'];
             var cc1 = data2_['cc1'];
             var cc2 = data2_['cc2'];
-
             for (var i = 0; i < c1.length; i++) {
-                   c1[i] = cc1[f][i]
-                   c2[i] = cc2[f][i]
+                   c1[i] = cc1[indices[f]][i]
+                   c2[i] = cc2[indices[f]][i]
+            }
+            console.log(cats[f]);
+            console.log(cats[f] > 0);
+            console.log(indices[f]);
+            // update button text and color
+            btn_idx.label= "#" + String(indices[f]+1);  // Keep 1-indexing for showing neurons
+            if (cats[indices[f]] > 0) {
+                btn_orig_cat.label = 'Original: accepted';
+                btn_orig_cat.background = 'green';
+            }
+            else {
+                btn_orig_cat.label = 'Original: rejected';
+                btn_orig_cat.background = 'red';
+            }
+            if (cats_new[indices[f]] > 0) {
+                btn_new_cat.label = 'Current: accepted';
+                btn_new_cat.background = 'green';
+            }
+            else {
+                btn_new_cat.label = 'Current: rejected';
+                btn_new_cat.background = 'red';
             }
             source2.change.emit();
             source.change.emit();
@@ -1051,8 +1122,8 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
     if r_values is not None:
         code += """
             var mets = metrics.data['mets']
-            mets[1] = metrics_.data['R'][f].toFixed(3)
-            mets[2] = metrics_.data['SNR'][f].toFixed(3)
+            mets[1] = metrics_.data['R'][indices[f]].toFixed(3)
+            mets[2] = metrics_.data['SNR'][indices[f]].toFixed(3)
             metrics.change.emit();
         """
         metrics = ColumnDataSource(data=dict(y=(3, 2, 1, 0),
@@ -1065,7 +1136,7 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
         else:
             metrics_ = ColumnDataSource(data=dict(R=r_values, SNR=SNR, CNN=cnn_preds))
             code += """
-                mets[3] = metrics_.data['CNN'][f].toFixed(3)
+                mets[3] = metrics_.data['CNN'][indices[f]].toFixed(3)
             """
         labels = LabelSet(x=0, y='y', text='keys', source=metrics, render_mode='canvas')
         labels2 = LabelSet(x=10, y='y', text='mets', source=metrics, render_mode='canvas', text_align="right")
@@ -1078,11 +1149,23 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
         plot2.add_layout(labels2)
     else:
         metrics, metrics_ = None, None
+    btn_idx = Button(label="#" + str(neurons_to_show.data['idx'][0]+1), disabled=True, width=60)
+    original_status = Button(label="original: accepted" if cell_category_original[0] > 0 else "original: rejected",
+                             disabled=True, width=150, background="green" if cell_category_original[0] > 0 else "red")
+    current_status = Button(label="current: accepted" if cell_category_new[0] > 0 else "current: rejected",
+                            disabled=True, width=150, background="green" if cell_category_new[0] > 0 else "red")
 
-    callback = CustomJS(args=dict(source=source, source_=source_, source2=source2,
-                                  source2_=source2_, metrics=metrics, metrics_=metrics_), code=code)
+    callback = CustomJS(args=dict(source=source, source_=source_,
+                                  source2=source2, source2_=source2_,
+                                  metrics=metrics, metrics_=metrics_,
+                                  categories=categories,
+                                  categories_new=categories_new,
+                                  btn_idx=btn_idx,
+                                  btn_orig_cat=original_status,
+                                  btn_new_cat=current_status,
+                                  neurons_to_show=neurons_to_show), code=code)
 
-    plot = bpl.figure(plot_width=600, plot_height=200, x_range=Range1d(0, Y_r.shape[0]))
+    plot = bpl.figure(plot_width=600, plot_height=200, x_range=Range1d(0, Y_r.shape[1]))
     plot.line('x', 'y', source=source, line_width=1, line_alpha=0.6)
     if denoised_color is not None:
         plot.line('x', 'y2', source=source, line_width=1,
@@ -1099,29 +1182,160 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
     plot1.patch('c1', 'c2', alpha=0.6, color='purple',
                 line_width=2, source=source2)
 
-    original_status = Button(label="original: " + ACCEPTED_TEXT, disabled=True, width=150, background=ACCEPTED_COLOR)
-    current_status = Button(label="current: " + REJECTED_TEXT, disabled=True, width=150, background=REJECTED_COLOR)
     transfer_button = Button(label="Transfer", width=100)
     save_button = Button(label="Save changes", width=100)
-    if Y_r.shape[0] > 1:
-        slider = bokeh.models.Slider(start=1, end=Y_r.shape[0], value=1, step=1,
-                                     title="Neuron Number")
-        slider.js_on_change('value', callback)
-        bpl.show(bokeh.layouts.layout([[slider, transfer_button, original_status, current_status], [bokeh.layouts.row(
-            plot1 if r_values is None else bokeh.layouts.column(plot1, plot2), plot)]]))
-    else:
-        bpl.show(bokeh.layouts.row(plot1 if r_values is None else
-                                   bokeh.layouts.column(plot1, plot2), plot))
-    # TODO: using slider should emit changes to original_status and current_status. Use subscribed_events
-    # TODO: also pressing transfer should update current_status.
-    # ButtonClick as event (for transfering)
 
-    # TODO: on clicking Transfer, print something; then print current slider value
-    # TODO: apparently, changing the python variables directly is not possible. Can create a JS variable initially, a
-    #  list of accepted/rejected. Create two of these, one for original status, the other vill be modified (current
-    #  status). Pressing Transfer changes the current status. Upon clicking on another button, export the old and
-    #  current status lists into python variables, then do the conversion in python."
-    return Y_r
+    menu = [("Rejected", "rejected"), ("Accepted", "accepted"), ("All", "all"), ("Modified", "modified")]
+    dropdown = Dropdown(label="Show " + menu[cell_category_original[2]][1], button_type="warning", menu=menu, width=100,
+                        name="dropdown")  # default is to show all
+
+    slider = Slider(start=1, end=Y_r.shape[0], value=1, step=1,
+                    title="Neuron Number")
+
+    if not (Y_r.shape[0] > 1):
+        # bpl.show(row(plot1 if r_values is None else
+        #              column(plot1, plot2), plot))
+        raise NotImplementedError("Y_r.shape[0] !> 1. This case has not been implemented yet.")
+
+    #slider.js_on_change('value', callback)
+
+    dropdown.js_on_event("menu_item_click", CustomJS(
+        args=dict(dropdown=dropdown, slider=slider, categories=categories, categories_new=categories_new,
+                  neurons_to_show=neurons_to_show), code=
+        """
+        var cats_orig = categories.data['cats'];
+        // current dropdown selection is item
+        // Change label
+        dropdown.label = 'Show ' + this.item;
+        // Change slider values
+        if (this.item == 'accepted') { // show originally accepted
+            const n_accepted = categories.data['cats'].reduce((a, b) => a + b, 0);
+            // Create an empty array for the indices of accepted components. array[i] = index of i-th accepted neuron.
+            var accepted_indices = [];
+            accepted_indices.length = n_accepted; 
+            accepted_indices.fill(0);
+            // TODO: need to get list of indices in categories that are non-zero. Iterate through categories,
+            // if element is non-zero, change next element in accepted_indices to the value. Increment accepted_indices pointer.
+            // If this kind of rebuilding is too slow, can create more data sources, and change them every time we change neuron classification.
+            var i_current = 0; // pointer to first  empty position in accepted_indices 
+            for (var i = 0; i < cats_orig.length; i++) {
+                if (cats_orig[i] > 0) { // the component was accepted originally 
+                    accepted_indices[i_current] = i;
+                    i_current += 1; 
+                }
+            }
+            console.log("Show accepted");
+            console.log(neurons_to_show.data['idx'].length);
+            neurons_to_show.data['idx'] = accepted_indices;
+            console.log(neurons_to_show.data['idx'].length);
+            slider.end = neurons_to_show.data['idx'].length;
+        }
+        else if (this.item == 'rejected') {
+            const n_rejected = cats_orig.length - categories.data['cats'].reduce((a, b) => a + b, 0);
+            
+            var rejected_indices = [];
+            rejected_indices.length = n_rejected; 
+            rejected_indices.fill(0);
+            var i_current = 0; // pointer to first  empty position in rejected_indices 
+            for (var i = 0; i < cats_orig.length; i++) {
+                if (cats_orig[i] == 0) { // the component was rejected originally 
+                    rejected_indices[i_current] = i;
+                    i_current += 1; 
+                }
+            }
+            console.log("Show rejected");
+            console.log(neurons_to_show.data['idx'].length);
+            neurons_to_show.data['idx'] = rejected_indices;
+            console.log(neurons_to_show.data['idx'].length);
+            slider.end = neurons_to_show.data['idx'].length;
+        }
+        else if (this.item == 'modified') {
+            var cats_new = categories_new.data['cats'];
+            // TODO: get number of cats_orig = cats_new, then get those components.
+            //TODO: do not look at cat_new but the temporary value that will be saved to file.
+            var n_modified = 0;
+            var modified_indices = [];
+            for (var i = 0; i < cats_orig.length; i++){
+                if (cats_orig[i] != cats_new[i]) {
+                    n_modified++;
+                    modified_indices.push(i);
+                }
+            }
+            if (n_modified > 0){
+                console.log("Show modified");
+                console.log(neurons_to_show.data['idx'].length);
+                neurons_to_show.data['idx'] = modified_indices;
+                console.log(neurons_to_show.data['idx'].length);
+                slider.end = neurons_to_show.data['idx'].length;
+                }
+        }
+        else { // show all components
+            var all_indices = [];
+            all_indices.length = cats_orig.length; 
+            all_indices.fill(0);  // TODO: probably possible to replace loop below with function in fill()
+            for (var i = 0; i < cats_orig.length; i++) {
+                all_indices[i] = i;
+            }
+            console.log("Show all");
+            console.log(neurons_to_show.data['idx'].length);
+            neurons_to_show.data['idx'] = all_indices;
+            console.log(neurons_to_show.data['idx'].length);
+            slider.end = neurons_to_show.data['idx'].length;
+        }
+        
+    
+        """))
+
+    # on pressing transfer, change the current category of the neuron.
+    on_transfer_pressed = CustomJS(
+        args={'transfer_button': transfer_button, 'curr_cat': categories_new, 'btn_curr_cat': current_status,
+              'slider': slider}, code="""
+    var i_cell = slider.value - 1
+    var cats_new = curr_cat.data['cats'];
+    // change current category
+    if (cats_new[i_cell] > 0) { // currently accepted -> change to rejected
+        cats_new[i_cell] = 0;
+        btn_curr_cat.label = 'current: rejected';
+        btn_curr_cat.background = 'red';
+    }
+    else {  // currently rejected -> change to accepted
+        cats_new[i_cell] = 1;
+        btn_curr_cat.label = 'current: accepted';
+        btn_curr_cat.background = 'green';
+    }
+    // cats_new.change.emit();  //change is undefined here
+    """)
+
+    out_fname = get_filename_with_date("manual_classification", extension='.txt')
+    save_data_callback = CustomJS(
+        args={'new_cats': categories_new, 'out_fname': out_fname},
+        code=
+        """
+        var data = new_cats.data['cats'];
+        var out = "";
+        for (var i=0; i < data.length; i++) {
+            out += data[i];
+            out += " ";
+        }
+        var file = new Blob([out], {type: 'text/plain'});
+        var elem = window.document.createElement('a');
+        elem.href = window.URL.createObjectURL(file);
+        elem.download = out_fname;
+        document.body.appendChild(elem);
+        elem.click();
+        document.body.removeChild(elem);
+        """
+    )
+
+    transfer_button.js_on_click(on_transfer_pressed)
+    save_button.js_on_click(save_data_callback)
+    bpl.show(layout([[slider, transfer_button, btn_idx, original_status, current_status, dropdown, save_button],
+                     row(plot1 if r_values is None else column(plot1, plot2), plot)]))
+    # return Y_r
+
+    # TODO: create save button to write results to a txt file. See https://stackoverflow.com/questions/54215667/bokeh-click-button-to-save-widget-values-to-txt-file-using-javascript
+    # and https://stackoverflow.com/questions/62290866/python-bokeh-applicationunable-to-export-updated-data-from-webapp-to-local-syst
+    return out_fname
 
 
 def nb_view_components_with_lfp_movement(estimates,
@@ -1199,7 +1413,7 @@ def nb_view_components_with_lfp_movement(estimates,
 
 def nb_view_components_manual_control(estimates,
                                       Yr=None, img=None, idx=None, denoised_color=None, cmap='jet', thr=0.99,
-                                      mode: str = "reject"):
+                                      mode: str = "all"):
     """view spatial and temporal components interactively in a notebook
 
     Args:
@@ -1232,7 +1446,7 @@ def nb_view_components_manual_control(estimates,
             name of colormap (e.g. 'viridis') used to plot image_neurons
             :param estimates:
 
-		mode: string
+		mode: string, one of ["all", "rejected", "accepted"]  # "modified" is also a category but it would be empty
 			Whether to go through accepted components and reject manually ("accepted" or reject"), or go through rejected components and move manually to accepted ("rejected" or "accept").
     """
     from matplotlib import pyplot as plt
@@ -1242,6 +1456,16 @@ def nb_view_components_manual_control(estimates,
     if 'csc_matrix' not in str(type(estimates.A)):
         estimates.A = scipy.sparse.csc_matrix(estimates.A)
 
+    if hasattr(estimates, "idx_components"):
+        if estimates.idx_components is not None:
+            idx_accepted = estimates.idx_components
+    else:
+        raise Exception("estimates does not have idx_components field")
+    if hasattr(estimates, "idx_components_bad"):
+        if estimates.idx_components_bad is not None:
+            idx_rejected = estimates.idx_components_bad
+    else:
+        raise Exception("estimates does not have idx_components_bad field")
     plt.ion()
     nr, T = estimates.C.shape
     if estimates.R is None:
@@ -1255,18 +1479,32 @@ def nb_view_components_manual_control(estimates,
     if img is None:
         img = np.reshape(np.array(estimates.A.mean(axis=1)), estimates.dims, order='F')
 
-    if idx is None:
-        nb_view_patches_manual_control(
-            Yr, estimates.A, estimates.C, estimates.b, estimates.f, estimates.dims[0], estimates.dims[1],
-            YrA=estimates.R, image_neurons=img, thr=thr, denoised_color=denoised_color, cmap=cmap,
-            r_values=estimates.r_values, SNR=estimates.SNR_comp, cnn_preds=estimates.cnn_preds)
-    else:
-        nb_view_patches_manual_control(
-            Yr, estimates.A.tocsc()[:, idx], estimates.C[idx], estimates.b, estimates.f,
-            estimates.dims[0], estimates.dims[1],
-            YrA=estimates.R[idx], image_neurons=img,
-            thr=thr, denoised_color=denoised_color, cmap=cmap,
-            r_values=None if estimates.r_values is None else estimates.r_values[idx],
-            SNR=None if estimates.SNR_comp is None else estimates.SNR_comp[idx],
-            cnn_preds=None if np.sum(estimates.cnn_preds) in (0, None) else estimates.cnn_preds[idx])
-    return estimates
+    out_fname = nb_view_patches_manual_control(
+        Yr, estimates.A.tocsc(), estimates.C, estimates.b, estimates.f,
+        estimates.dims[0], estimates.dims[1],
+        YrA=estimates.R, image_neurons=img,
+        thr=thr, denoised_color=denoised_color, cmap=cmap,
+        r_values=None if estimates.r_values is None else estimates.r_values,
+        SNR=None if estimates.SNR_comp is None else estimates.SNR_comp,
+        cnn_preds=None if np.sum(estimates.cnn_preds) in (0, None) else estimates.cnn_preds,
+        mode=mode,
+        idx_accepted=idx_accepted,
+        idx_rejected=idx_rejected)
+    # return estimates
+    return out_fname
+
+
+def reopen_manual_control(fname: str) -> List:
+    """
+    :param fname: the file name parameter of nb_view_components_manual_control
+    :return: list where each element is 0 or 1, corresponding to whether neuron i is rejected (0) or accepted (1) after
+            manual inspection.
+    """
+    from labrotation.file_handling import open_dir
+    import os
+    downloads_folder = open_dir("Find downloads directory.")
+    file_string = ""
+    with open(os.path.join(downloads_folder, fname), "r") as f:
+        for line in f.readlines():
+            file_string += line
+    return list(map(lambda s: int(s.rstrip()), file_string.rstrip().split(" ")))
