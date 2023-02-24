@@ -54,9 +54,10 @@ def choose_dir_for_saving_file(title: str = "Select a folder to save the file to
 
 def get_filename_with_date(raw_filename: str = "output_file", extension: str = ".txt"):
     """
-    Given a root filename,
+    Given a root filename raw_filename, create an extended filename with extension. This avoids overwriting files saved
+    repeatedly to the same folder by appending the date and time (including the seconds).
     :param raw_filename: file name without extension
-    :param extension:
+    :param extension: the desired file extension. It should include the '.'!
     :return:
     """
     # todo: this should be a bit more sophisticated. (dealing with cases like extension without "." etc.), getting rid
