@@ -8,7 +8,7 @@ from numpy import float64, ndarray
 from typing import List, Optional
 import numpy as np
 
-
+# TODO: numpy_to_hdf5 is useful in general in io operations. Move to more appropriate file.
 def numpy_to_hdf5(numpy_data: ndarray,
                   export_fpaths,
                   start_end_frames: List[tuple] = None,
@@ -29,6 +29,7 @@ def numpy_to_hdf5(numpy_data: ndarray,
     """
     # TODO: if export_fpaths lists one or more .h5 files, switch the extension to hdf5 instead of creating a file like
     #  xy.h5.hdf5
+	# TODO: instead of creating dataset with shape same as a numpy array, one can set hf.create_dataset(dataset_name, data=numpy_array).
     FUNC_NAME = "numpy_to_hdf5: "
     if isinstance(export_fpaths, str):  # need to check whether to create multiple file names from single given
         print(f"{FUNC_NAME}Single output filename detected.")
