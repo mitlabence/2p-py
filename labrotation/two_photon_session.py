@@ -60,6 +60,7 @@ class TwoPhotonSession:
 
         Implied (assigned using basic attributes)
             nikon_movie
+            nikon_true_length: int
             nikon_meta
             lfp_file: pyabf.abf.ABF, the raw lfp data
             belt_dict
@@ -74,6 +75,7 @@ class TwoPhotonSession:
             lfp_t_start: datetime.datetime
             nik_t_start: datetime.datetime
             lfp_scaling: float = LFP_SCALING_FACTOR defined in __init__
+            mean_fluo: np.array(np.float64?) mean fluorescence [optional]
     """
 
     # IMPORTANT: change the used lfp_scaling to always be the actual scaling used! Important for exporting (saving)
@@ -82,7 +84,7 @@ class TwoPhotonSession:
     # TODO:
     def __init__(self, nd2_path: str = None, nd2_timestamps_path: str = None, labview_path: str = None,
                  labview_timestamps_path: str = None,
-                 lfp_path: str = None, matlab_2p_folder: str = None, **kwargs):
+                 lfp_path: str = None, matlab_2p_folder: str = None, uuid: str = None, **kwargs):
         """
         Instantiate a TwoPhotonSession object with only basic parameters defined. This is the default constructor as
         preprocessing might take some time, and it might diverge for various use cases in the future.
@@ -106,6 +108,7 @@ class TwoPhotonSession:
             self.MATLAB_2P_FOLDER = matlab_2p_folder
         else:
             raise ModuleNotFoundError("matlab-2p path was not found")
+        self.uuid = uuid
         # set inferred attributes to default value
         self.nikon_movie = None
         self.nikon_meta = None
@@ -122,6 +125,8 @@ class TwoPhotonSession:
         self.lfp_t_start = None
         self.nik_t_start = None
         self.lfp_scaling = None
+        self.mean_fluo = None
+        self.nikon_true_length = None
         self.verbose = True  # printing some extra text by default
 
         # check for optionally supported keyword arguments:
@@ -140,6 +145,7 @@ class TwoPhotonSession:
         self._assign_from_kwargs("lfp_t_start", kwargs)
         self._assign_from_kwargs("nik_t_start", kwargs)
         self._assign_from_kwargs("lfp_scaling", kwargs)
+        self._assign_from_kwargs("nikon_true_length", kwargs)
         self._assign_from_kwargs("verbose", kwargs)
 
     def _assign_from_kwargs(self, attribute_name: str, kwargs_dict: dict):
@@ -151,15 +157,17 @@ class TwoPhotonSession:
     @classmethod
     def init_and_process(cls, nd2_path: str = None, nd2_timestamps_path: str = None, labview_path: str = None,
                          labview_timestamps_path: str = None,
-                         lfp_path: str = None, matlab_2p_folder: str = None):
+                         lfp_path: str = None, matlab_2p_folder: str = None, uuid: str = None, **kwargs):
         """
-        Instantiate a TwoPhotonSession object and perform the
+        Instantiate a TwoPhotonSession object and perform the processing steps automatically.
         :param nd2_path: complete path of nd2 file
         :param nd2_timestamps_path: complete path of nd2 time stamps (txt) file
         :param labview_path: complete path of labview txt file (e.g. M278.20221028.133021.txt)
         :param labview_timestamps_path: complete path of labview time stamps (e.g. M278.20221028.133021time.txt)
         :param lfp_path: complete path of lfp (abf) file
         :param matlab_2p_folder: folder of matlab scripts (e.g. C:/matlab-2p/)
+        :param uuid: uuid from data documentation (if exists)
+
         :return: None
         """
         # infer rest of class attributes automatically.
@@ -168,23 +176,26 @@ class TwoPhotonSession:
                        labview_path=labview_path,
                        labview_timestamps_path=labview_timestamps_path,
                        lfp_path=lfp_path,
-                       matlab_2p_folder=matlab_2p_folder)
+                       matlab_2p_folder=matlab_2p_folder, uuid=uuid, **kwargs)
         instance._open_data()
         # convert matlab arrays into numpy arrays
-        for k, v in instance.belt_dict.items():
-            instance.belt_dict[k] = instance._matlab_array_to_numpy_array(
-                instance.belt_dict[k])
-        for k, v in instance.belt_scn_dict.items():
-            instance.belt_scn_dict[k] = instance._matlab_array_to_numpy_array(
-                instance.belt_scn_dict[k])
-
-        instance._nikon_remove_na()
+        if instance.belt_dict is not None:
+            for k, v in instance.belt_dict.items():
+                instance.belt_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_dict[k])
+        if instance.belt_scn_dict is not None:
+            for k, v in instance.belt_scn_dict.items():
+                instance.belt_scn_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_scn_dict[k])
+        if instance.nikon_meta is not None:
+            instance._nikon_remove_na()
         instance._create_nikon_daq_time()  # defines self.nikon_daq_time
         instance._match_lfp_nikon_stamps()  # creates time_offs_lfp_nik
-        instance._create_lfp_df(
-            time_offs_lfp_nik=instance.time_offs_lfp_nik, cut_begin=0.0, cut_end=instance.nikon_daq_time.iloc[-1])
+        if instance.nikon_daq_time is not None:
+            instance._create_lfp_df(
+                time_offs_lfp_nik=instance.time_offs_lfp_nik, cut_begin=0.0, cut_end=instance.nikon_daq_time.iloc[-1])
         instance._create_belt_df()
         instance._create_belt_scn_df()
+        if instance.ND2_PATH is not None:
+            instance.mean_fluo = instance.return_nikon_mean()
         return instance
 
     @classmethod
@@ -231,6 +242,7 @@ class TwoPhotonSession:
 
     @classmethod
     def from_hdf5(cls, fpath: str, try_open_files: bool = True):
+        # TODO: make it work with new structure of export_hdf5, incl. omitting dataframes for saving (these should be easy to recreate) if the proper flag was not set.
         # TODO: handle exceptions (missing data)
 
         with h5py.File(fpath, "r") as hfile:
@@ -281,9 +293,10 @@ class TwoPhotonSession:
             instance.lfp_t_start = datetime.datetime.strptime(hfile["inferred"]["lfp_t_start"][()], DATETIME_FORMAT)
             instance.nik_t_start = datetime.datetime.strptime(hfile["inferred"]["nik_t_start"][()], DATETIME_FORMAT)
             instance.lfp_scaling = hfile["inferred"]["lfp_scaling"][()]
-        if try_open_files:
+        if try_open_files:  # TODO: could be perfect duplicate of _open_data(). At least part of the code is duplicate
             try:
                 instance.nikon_movie = pims_nd2.ND2_Reader(instance.ND2_PATH)
+                instance.nikon_true_length = self._find_nd2_true_length()
             except FileNotFoundError:
                 print(f"from_hdf5: nd2 file not found:\n\t{instance.ND2_PATH}. Skipping opening.")
             try:
@@ -295,8 +308,8 @@ class TwoPhotonSession:
     def _open_data(self):  # TODO: rename this, as this does not only open data, but also processes some data.
         if self.ND2_PATH is not None:
             self.nikon_movie = pims_nd2.ND2_Reader(self.ND2_PATH)
-            # TODO: nikon_movie should be closed properly upon removing this class (or does the garbage collector
-            #  take care of it?)
+            self.nikon_true_length = self._find_nd2_true_length()
+            # TODO: nikon_movie should be closed properly upon removing this class (or does the reference counter take care of it?)
         if self.ND2_TIMESTAMPS_PATH is not None:
             try:
                 self.nikon_meta = self.drop_nan_cols(
@@ -312,7 +325,8 @@ class TwoPhotonSession:
                     pd.read_csv(
                         output_file_path, delimiter="\t", encoding="utf_16_le"))
                 self.ND2_TIMESTAMPS_PATH = output_file_path
-        if hasattr(self, "LABVIEW_PATH") and self.LABVIEW_PATH is not None:
+        if hasattr(self, "LABVIEW_PATH") and self.LABVIEW_PATH is not None and \
+                hasattr(self, "ND2_TIMESTAMPS_PATH") and self.ND2_TIMESTAMPS_PATH is not None:
             self.belt_dict, self.belt_scn_dict, self.belt_params = belt_processing.beltProcessPipelineExpProps(
                 self.LABVIEW_PATH, self.ND2_TIMESTAMPS_PATH, self.MATLAB_2P_FOLDER)
 
@@ -334,6 +348,8 @@ class TwoPhotonSession:
                 print(
                     f"No conversion of belt_length_mm happened, as belt_params['belt_length_mm'] is type "
                     f"{type(self.belt_params['belt_length_mm'])}")
+        else:
+            print("No matching of Nikon and Labview takes place. Reason: one of the sources is missing.")
         if hasattr(self, "LFP_PATH") and self.LFP_PATH is not None:
             self.lfp_file = abf.ABF(self.LFP_PATH)
             self.lfp_scaling = LFP_SCALING_FACTOR
@@ -353,9 +369,12 @@ class TwoPhotonSession:
 
     def _nikon_remove_na(self):
         # get the stimulation metadata frames
-        event_times = self.nikon_meta[self.nikon_meta["Index"].isna() == True]
-        # drop non-imaging frames from metadata
-        self.nikon_meta.dropna(subset=["Index"], inplace=True)
+        if self.nikon_meta is None:
+            warnings.warn("_nikon_remove_na(): nikon metadata not available.")
+        else:
+            event_times = self.nikon_meta[self.nikon_meta["Index"].isna() == True]
+            # drop non-imaging frames from metadata
+            self.nikon_meta.dropna(subset=["Index"], inplace=True)
 
     def _lfp_movement_raw(self):
         self.lfp_file.setSweep(sweepNumber=0, channel=1)
@@ -390,16 +409,19 @@ class TwoPhotonSession:
         return self.belt_df.time_s, self.belt_df.speed
 
     def _create_nikon_daq_time(self):
-        self.nikon_daq_time = self.nikon_meta["NIDAQ Time [s]"]
-        if isinstance(self.nikon_daq_time.iloc[0], float):  # no change needed
-            pass
-        elif isinstance(self.nikon_daq_time.iloc[0], str):
-            # if elements are string, they seem to have comma as decimal separator. Need to replace it by a dot.
-            self.nikon_daq_time = self.nikon_daq_time.apply(
-                lambda s: float(s.replace(",", ".")))
-        else:  # something went really wrong!
-            raise ValueError(
-                f"nikon_daq_time has unsupported data type: {type(self.nikon_daq_time.iloc[0])}")
+        if self.nikon_meta is None:
+            warnings.warn("_create_nikon_daq_time: nikon metadata is not available.")
+        else:
+            self.nikon_daq_time = self.nikon_meta["NIDAQ Time [s]"]
+            if isinstance(self.nikon_daq_time.iloc[0], float):  # no change needed
+                pass
+            elif isinstance(self.nikon_daq_time.iloc[0], str):
+                # if elements are string, they seem to have comma as decimal separator. Need to replace it by a dot.
+                self.nikon_daq_time = self.nikon_daq_time.apply(
+                    lambda s: float(s.replace(",", ".")))
+            else:  # something went really wrong!
+                raise ValueError(
+                    f"nikon_daq_time has unsupported data type: {type(self.nikon_daq_time.iloc[0])}")
 
     def shift_lfp(self, seconds: float = 0.0, match_type: str = "Nikon") -> None:
         """
@@ -417,15 +439,24 @@ class TwoPhotonSession:
 
     # TODO: this does not actually matches the two, but gets the offset for matching
     def _match_lfp_nikon_stamps(self) -> None:
-        if hasattr(self, "lfp_file") and self.lfp_file is not None:
+        if hasattr(self, "lfp_file") and self.lfp_file is not None and self.nikon_movie is not None:
             # time zone of the recording computer
             tzone_local = pytz.timezone('Europe/Berlin')
             tzone_utc = pytz.utc
 
             lfp_t_start: datetime.datetime = tzone_local.localize(
                 self.lfp_file.abfDateTime)  # supply timezone information
-            nik_t_start: datetime.datetime = tzone_utc.localize(
-                self.nikon_movie.metadata["time_start_utc"])
+            try:
+                nik_t_start: datetime.datetime = tzone_utc.localize(
+                    self.nikon_movie.metadata["time_start_utc"])
+            except Exception as e:  # in case of exception, a corruption might have happened, so last part of metadata is missing.
+                # code of @property metadata() from nd2reader.py (pims_nd2)
+                warnings.warn(
+                    "Error reading out metadata of nd2. Recording might be corrupted; most likely\
+                     later time stamps. Check for repeated values in exported _nik.txt meta file. \
+                     Attempting to read out only first time stamp...")
+                nik_t_start: datetime.datetime = tzone_utc.localize(
+                    pims_nd2.ND2SDK.jdn_to_datetime_utc(self.nikon_movie._lim_metadata_desc.dTimeStart))
 
             # now both can be converted to utc
             lfp_t_start = lfp_t_start.astimezone(pytz.utc)
@@ -454,11 +485,38 @@ class TwoPhotonSession:
             time_offs_lfp_nik = None
         self.time_offs_lfp_nik = time_offs_lfp_nik
 
+    def _find_nd2_true_length(self) -> int:
+        """
+        The default value, len(self.nikon_movie), in case of corruption, is greater than the actual accessible length.
+        This function checks the last frame that is accessible, and returns the total length from frame 1 to the last
+        accessible frame.
+        :return: int, the true length. If the last frame is readable, this is equal to len(self.nikon_movie)
+        """
+        if self.nikon_movie is not None:
+            i = len(self.nikon_movie) - 1
+            frame_read_success = False
+            while not frame_read_success:
+                try:
+                    fr = self.nikon_movie[i]
+                    frame_read_success = True
+                    # TODO: could just return the detected length here. Not sure about asynchronous events (is Exception caught immediately?)
+                except Exception:  # TODO: separate KeyboardInterrupt!
+                    i -= 1
+                    frame_read_success = False
+                if i < 0:
+                    raise Error("self.nikon_movie cannot be read!")
+            return i + 1
+        else:
+            warnings.warn("Warning: _find_nd2_true_length() called, but self.nikon_movie is None! Returning 0.")
+            return 0
+
     def _belt_dict_to_df(self, belt_dict: dict) -> pd.DataFrame:
         """
         This function takes belt_dict or belt_scn_dict and returns it as a dataframe. Some columns with less entries
         are removed!
         """
+        if belt_dict is None:
+            return None
         if "runtime" in belt_dict:  # only reliable way I know of to differentiate between belt and belt_scn.
             bd = belt_dict.copy()
             bd.pop("runtime")
@@ -524,14 +582,26 @@ class TwoPhotonSession:
 
         # now nd2_to_caiman.py
 
-    def get_nikon_data(self, i_begin: int = None, i_end: int = None) -> np.array:  # TODO: test this
+    def get_nikon_data(self, i_begin: int = None, i_end: int = None) -> np.array:
+        """
+        :param i_begin: 0-indexed first frame to get
+        :param i_end: 0-indexed last frame to get
+        :return:
+        """
+        # TODO: test this function properly
+        # TODO: i_begin OR i_end not defined, set them to 0 or last frame, respectively
         # set iter_axes to "t"
         # then: create nd array with sizes matching frame size,
         sizes_dict = self.nikon_movie.sizes
+        true_len = self._find_nd2_true_length()
+        if "t" in sizes_dict.keys() and sizes_dict["t"] > true_len:
+            warnings.warn("Warning: get_nikon_data called on corrupt file. Will not use corrupt, inaccessible frames")
+            sizes_dict["t"] = true_len
         pixel_type = self.nikon_movie.pixel_type
         if (i_begin is not None) and (i_end is not None):
             n_frames = i_end - i_begin
             i_first = i_begin
+            assert i_end < sizes_dict["t"]
         else:
             n_frames = sizes_dict['t']
             i_first = 0
@@ -569,14 +639,14 @@ class TwoPhotonSession:
                 belt_params
 
             Not saved:
-                (lfp_file)
-                (nikon_movie)
-                (nikon_meta)
-                (lfp_df)
-                (lfp_df_cut)
-                (belt_df)
-                (belt_scn_df)
-                (nikon_daq_time)
+                (lfp_file) - ABFReader
+                (nikon_movie) - ND2Reader
+                (nikon_meta) - DataFrame
+                (lfp_df) - DataFrame
+                (lfp_df_cut) - DataFrame
+                (belt_df) - DataFrame
+                (belt_scn_df) - DataFrame
+                (nikon_daq_time) - DataFrame/Series
         """
         raise NotImplementedError("export_json() is deprecated and should not be used.")
         fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".json")
@@ -609,71 +679,134 @@ class TwoPhotonSession:
 
     # TODO: handle missing files
     # FIXME: if lfp missing, no inferred group is created!
-    def export_hdf5(self, **kwargs) -> None:
+    def export_hdf5(self, fpath: str = None, save_full: bool = False, **kwargs) -> str:
+        """
+        Parameters to export:
+                creation_time: str(datetime.now()) for version checking
+            Basic attributes:
+                self.uuid
+                self.ND2_PATH
+                self.ND2_TIMESTAMPS_PATH
+                self.LABVIEW_PATH
+                self.LABVIEW_TIMESTAMPS_PATH
+                self.LFP_PATH
+                self.MATLAB_2P_FOLDER
+            Inferred attributes:
+                self.belt_dict
+                self.belt_scn_dict
+                self.time_offs_lfp_nik
+                self.lfp_t_start
+                self.nik_t_start
+                self.lfp_scaling
+                self.belt_params
+                self.nikon_daq_time - Series
+                self.mean_fluo
+                Optionally saved (save_full = True):
+                    [lfp_df] - DataFrame
+                    [lfp_df_cut] - DataFrame
+                    [belt_df] - DataFrame
+                    [belt_scn_df] - DataFrame
+            Not saved:
+                (nikon_meta) - DataFrame
+                (lfp_file) - ABFReader
+                (nikon_movie) - ND2Reader
+
+        :param kwargs:
+        safe_full: bool - flag whether to save redundant dataframes (i.e. the full object, except the data sources).
+        :return: fpath: the exported file path as string.
+        """
         # set export file name and path
-        fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".h5")
+        if fpath is None:
+            fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".h5")
         with h5py.File(fpath, "w") as hfile:
+            hfile.attrs["creation_time"] = str(datetime.datetime.now())
+            hfile.attrs["uuid"] = self.uuid
+            if self.mean_fluo is not None:
+                hfile.create_dataset("mean_fluo", data=self.mean_fluo)
             basic_group = hfile.create_group("basic")
             # basic parameters
-            basic_group["ND2_PATH"] = self.ND2_PATH
-            basic_group["ND2_TIMESTAMPS_PATH"] = self.ND2_TIMESTAMPS_PATH
-            basic_group["LABVIEW_PATH"] = self.LABVIEW_PATH
-            basic_group["LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH
+            basic_group["ND2_PATH"] = self.ND2_PATH if self.ND2_PATH is not None else ""
+            basic_group[
+                "ND2_TIMESTAMPS_PATH"] = self.ND2_TIMESTAMPS_PATH if self.ND2_TIMESTAMPS_PATH is not None else ""
+            basic_group["LABVIEW_PATH"] = self.LABVIEW_PATH if self.LABVIEW_PATH is not None else ""
+            basic_group[
+                "LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH if self.LABVIEW_TIMESTAMPS_PATH is not None else ""
             basic_group["LFP_PATH"] = self.LFP_PATH if self.LFP_PATH is not None else ""
-            basic_group["MATLAB_2P_FOLDER"] = self.MATLAB_2P_FOLDER
+            basic_group["MATLAB_2P_FOLDER"] = self.MATLAB_2P_FOLDER if self.MATLAB_2P_FOLDER is not None else ""
             # implied parameters
             inferred_group = hfile.create_group("inferred")
             # save nikon_meta as group with columns as datasets
-            nikon_meta_group = inferred_group.create_group("nikon_meta")
-            for colname in self.nikon_meta.keys():
-                nikon_meta_group[colname] = self.nikon_meta[colname].to_numpy()
+            # nikon_meta_group = inferred_group.create_group("nikon_meta")
+            # if self.nikon_meta is not None:
+            #    for col_name in self.nikon_meta.keys():
+            #        nikon_meta_group[col_name] = self.nikon_meta[col_name].to_numpy()
             # save belt_dict
             belt_dict_group = inferred_group.create_group("belt_dict")
-            for key, value in self.belt_dict.items():
-                belt_dict_group[key] = value
+            if self.belt_dict is not None:
+                for key, value in self.belt_dict.items():
+                    belt_dict_group[key] = value
             # save belt_scn_dict
-            belt_scn_dict_group = inferred_group.create_group("belt_scn_dict")
-            for key, value in self.belt_scn_dict.items():
-                belt_scn_dict_group[key] = value
+            if self.belt_scn_dict is not None:
+                belt_scn_dict_group = inferred_group.create_group("belt_scn_dict")
+                for key, value in self.belt_scn_dict.items():
+                    belt_scn_dict_group[key] = value
             # save pandas Series nikon_daq_time
-            inferred_group["nikon_daq_time"] = self.nikon_daq_time.to_numpy()
+            if self.nikon_daq_time is not None:
+                inferred_group["nikon_daq_time"] = self.nikon_daq_time.to_numpy()
             # save time_offs_lfp_nik
-            inferred_group[
-                "time_offs_lfp_nik"] = self.time_offs_lfp_nik if self.time_offs_lfp_nik is not None else np.nan
+            if self.time_offs_lfp_nik is not None:
+                inferred_group[
+                    "time_offs_lfp_nik"] = self.time_offs_lfp_nik if self.time_offs_lfp_nik is not None else np.nan
             # save belt_params
-            belt_params_group = inferred_group.create_group("belt_params")
-            for key, value in self.belt_params.items():
-                belt_params_group[key] = value
-            # save lfp_t_start, nik_t_start, lfp_scaling
+            if self.belt_params is not None:
+                belt_params_group = inferred_group.create_group("belt_params")
+                for key, value in self.belt_params.items():
+                    belt_params_group[key] = value
+            # save lfp_t_start, nik_t_start, lfp_scaling if available
             inferred_group["lfp_t_start"] = self.lfp_t_start.strftime(
                 DATETIME_FORMAT) if self.lfp_t_start is not None else ""
             inferred_group["nik_t_start"] = self.nik_t_start.strftime(
                 DATETIME_FORMAT) if self.nik_t_start is not None else ""
             inferred_group["lfp_scaling"] = self.lfp_scaling if self.lfp_scaling is not None else np.nan
             # save lfp_df
-            lfp_df_group = inferred_group.create_group("lfp_df")
-            if self.lfp_df is not None:
-                for colname in self.lfp_df.keys():
-                    lfp_df_group[colname] = self.lfp_df[colname].to_numpy()
+            if self.lfp_df is not None and save_full:
+                lfp_df_group = inferred_group.create_group("lfp_df")
+                for col_name in self.lfp_df.keys():
+                    lfp_df_group[col_name] = self.lfp_df[col_name].to_numpy()
             # save lfp_df_cut
-            lfp_df_cut_group = inferred_group.create_group("lfp_df_cut")
-            if self.lfp_df_cut is not None:
-                for colname in self.lfp_df_cut.keys():
-                    lfp_df_cut_group[colname] = self.lfp_df_cut[colname].to_numpy()
+            if self.lfp_df_cut is not None and save_full:
+                lfp_df_cut_group = inferred_group.create_group("lfp_df_cut")
+                for col_name in self.lfp_df_cut.keys():
+                    lfp_df_cut_group[col_name] = self.lfp_df_cut[col_name].to_numpy()
             # save belt_df
-            belt_df_group = inferred_group.create_group("belt_df")
-            if self.belt_df is not None:
-                for colname in self.belt_df.keys():
-                    belt_df_group[colname] = self.belt_df[colname].to_numpy()
+            if self.belt_df is not None and save_full:
+                belt_df_group = inferred_group.create_group("belt_df")
+                for col_name in self.belt_df.keys():
+                    belt_df_group[col_name] = self.belt_df[col_name].to_numpy()
             # save belt_scn_df
-            belt_scn_df_group = inferred_group.create_group("belt_scn_df")
-            if self.belt_scn_df is not None:
-                for colname in self.belt_scn_df.keys():
-                    belt_scn_df_group[colname] = self.belt_scn_df[colname].to_numpy()
+            if self.belt_scn_df is not None and save_full:
+                belt_scn_df_group = inferred_group.create_group("belt_scn_df")
+                for col_name in self.belt_scn_df.keys():
+                    belt_scn_df_group[col_name] = self.belt_scn_df[col_name].to_numpy()
+        return fpath
 
     # TODO: get nikon frame matching time stamps (NIDAQ time)! It is session.nikon_daq_time
     def return_nikon_mean(self):
-        return np.array([self.nikon_movie[i_frame].mean() for i_frame in range(self.nikon_movie.sizes["t"])])
+        if self.nikon_true_length is None:
+            self.nikon_true_length = self._find_nd2_true_length()
+        try:
+            if self.nikon_true_length < len(self.nikon_movie):
+                warnings.warn("Warning: self.nikon_true_length is smaller than length of self.nikon_movie.\
+                     This means most likely corrupted frames. Part of recording can not be opened.\
+                      Take this into consideration in further analysis.")
+            arr = np.array([self.nikon_movie[i_frame].mean() for i_frame in range(self.nikon_true_length)])
+            return arr
+        except KeyboardInterrupt as e:
+            warnings.warn("return_nikon_mean: Keyboard interrupt detected. Returning empty np.array().")
+            return np.array([])
+        except Exception:
+            warnings.warn(
+                "Error reading out nd2 file; it seems to be corrupted. It might be possible to save it to tiff using the nikon software, and calculate the mean from that.")
 
     def infer_labview_timestamps(self):
         """
@@ -1406,12 +1539,12 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
 
     # idx_accepted and idx_rejected should be disjoint lists coming from CaImAn. (0-indexing)
     # set to 1 all the entries that correspond to accepted components. Rest is 0.
-    if mode=="rejected":
+    if mode == "rejected":
         orig_cat = 0
-        CAT_COLOR="red"
+        CAT_COLOR = "red"
     else:
         orig_cat = 1
-        CAT_COLOR="green"
+        CAT_COLOR = "green"
 
     cell_category_new = [orig_cat for i in range(n_neurons)]
 
@@ -1452,7 +1585,7 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
     categories_new = ColumnDataSource(data=dict(cats=cell_category_new))
     index_map = ColumnDataSource(data=dict(indices=idx))
     # make original category accessible to javascript
-    category_original = ColumnDataSource(data=dict(cat=[0 if mode=="rejected" else 1]))
+    category_original = ColumnDataSource(data=dict(cat=[0 if mode == "rejected" else 1]))
 
     slider_code = """
             var data = source.data;
@@ -1581,7 +1714,8 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
            """)
 
     save_data_callback = CustomJS(
-        args={'new_cats': categories_new, 'index_map': index_map, 'out_fname': out_fname, 'category_original':category_original},
+        args={'new_cats': categories_new, 'index_map': index_map, 'out_fname': out_fname,
+              'category_original': category_original},
         code=
         """
         const cat_orig = category_original.data['cat'];
@@ -1787,7 +1921,7 @@ def nb_view_components_manual_control(estimates,
     return out_fname
 
 
-def reopen_manual_control(fname: str, downloads_folder:str=None) -> List:
+def reopen_manual_control(fname: str, downloads_folder: str = None) -> List:
     """
     :param fname: the file name parameter of nb_view_components_manual_control
     :return: list where each element is 0 or 1, corresponding to whether neuron i is rejected (0) or accepted (1) after
