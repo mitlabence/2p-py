@@ -5,6 +5,7 @@ Set this to the project interpreter in PyCharm. It might still run the default a
 
 pip install pyabf  (2.3.7)
 pip install pims_nd2  (1.1)
+pip install tables (for pandas df.to_hdf() )
 
 Other:
 Install matlab engine for python. See Test Matlab Integration notebook.
