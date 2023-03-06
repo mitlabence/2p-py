@@ -2,6 +2,21 @@ import matlab.engine
 from labrotation.file_handling import open_dir, open_file
 import os.path
 
+# The structure of a labview output file, decoded from the labview file (Movementdetection.vi, Integrator.vi) by column:
+# 1.  Rounds
+# 2.  Speed
+# 3.  Total distance
+# 4.  DistancePR (per round)
+# 5.  Reflectivity
+# 6.  Lick detection
+# 7.  Stripes in total
+# 8.  Stripes in round
+# 9.  Total time
+# 10. Time per round
+# 11. Stimuli
+# ... Stimuli
+# 19. Stimuli
+# 20. Pupil area
 
 def beltProcessPipeline(belt_path: str, matlab_2p_folder: str, nargout: int = 1) -> dict:
     # TODO: add nikon_ts_path here as well, see beltProcessPipelineExpProps
