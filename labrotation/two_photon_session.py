@@ -255,44 +255,59 @@ class TwoPhotonSession:
                            labview_timestamps_path=basic_attributes["LABVIEW_TIMESTAMPS_PATH"][()],
                            lfp_path=basic_attributes["LFP_PATH"][()],
                            matlab_2p_folder=basic_attributes["MATLAB_2P_FOLDER"][()])
+            if "uuid" in hfile.attrs:
+                instance.uuid = hfile.attrs["uuid"]
             # assign dictionary-type attributes
             instance.belt_dict = dict()
             instance.belt_scn_dict = dict()
             instance.belt_params = dict()
-            for key, value in hfile["inferred"]["belt_dict"].items():
-                instance.belt_dict[key] = value[()]
-            for key, value in hfile["inferred"]["belt_scn_dict"].items():
-                instance.belt_scn_dict[key] = value[()]
-            for key, value in hfile["inferred"]["belt_params"].items():
-                instance.belt_params[key] = value[()]
+            if "inferred" in hfile.keys():
+                if "belt_dict" in hfile["inferred"].keys():  # assume here that all three are saved (or not) together
+                    for key, value in hfile["inferred"]["belt_dict"].items():
+                        instance.belt_dict[key] = value[()]
+                    for key, value in hfile["inferred"]["belt_scn_dict"].items():
+                        instance.belt_scn_dict[key] = value[()]
+                    for key, value in hfile["inferred"]["belt_params"].items():
+                        instance.belt_params[key] = value[()]
             # create dict for dataframes
-            nikon_meta_dict = dict()
-            for key, value in hfile["inferred"]["nikon_meta"].items():
-                nikon_meta_dict[key] = value[()]
-            belt_df_dict = dict()
-            for key, value in hfile["inferred"]["belt_df"].items():
-                belt_df_dict[key] = value[()]
-            belt_scn_df_dict = dict()
-            for key, value in hfile["inferred"]["belt_scn_df"].items():
-                belt_scn_df_dict[key] = value[()]
-            lfp_df_dict = dict()
-            for key, value in hfile["inferred"]["lfp_df"].items():
-                lfp_df_dict[key] = value[()]
-            lfp_df_cut_dict = dict()
-            for key, value in hfile["inferred"]["lfp_df_cut"].items():
-                lfp_df_cut_dict[key] = value[()]
-            instance.nikon_meta = pd.DataFrame.from_dict(nikon_meta_dict)
-            instance.belt_df = pd.DataFrame.from_dict(belt_df_dict)
-            instance.belt_scn_df = pd.DataFrame.from_dict(belt_scn_df_dict)
-            instance.lfp_df = pd.DataFrame.from_dict(lfp_df_dict)
-            instance.lfp_df_cut = pd.DataFrame.from_dict(lfp_df_cut_dict)
+            if "nikon_meta" in hfile["inferred"].keys():
+                nikon_meta_dict = dict()
+                for key, value in hfile["inferred"]["nikon_meta"].items():
+                    nikon_meta_dict[key] = value[()]
+                instance.nikon_meta = pd.DataFrame.from_dict(nikon_meta_dict)
+            if "belt_df" in hfile["inferred"].keys():
+                belt_df_dict = dict()
+                for key, value in hfile["inferred"]["belt_df"].items():
+                    belt_df_dict[key] = value[()]
+                instance.belt_df = pd.DataFrame.from_dict(belt_df_dict)
+            if "belt_scn_df" in hfile["inferred"].keys():
+                belt_scn_df_dict = dict()
+                for key, value in hfile["inferred"]["belt_scn_df"].items():
+                    belt_scn_df_dict[key] = value[()]
+                instance.belt_scn_df = pd.DataFrame.from_dict(belt_scn_df_dict)
+            if "lfp_df" in hfile["inferred"].keys():  # assume lfp_df and lfp_df_cut created and saved together
+                lfp_df_dict = dict()
+                for key, value in hfile["inferred"]["lfp_df"].items():
+                    lfp_df_dict[key] = value[()]
+                instance.lfp_df = pd.DataFrame.from_dict(lfp_df_dict)
+                lfp_df_cut_dict = dict()
+                for key, value in hfile["inferred"]["lfp_df_cut"].items():
+                    lfp_df_cut_dict[key] = value[()]
+                instance.lfp_df_cut = pd.DataFrame.from_dict(lfp_df_cut_dict)
+            if "lfp_df" in hfile["nikon_daq_time"].keys():
+                instance.nikon_daq_time = pd.Series(hfile["inferred"]["nikon_daq_time"][()])
+            if "time_offs_lfp_nik" in hfile["nikon_daq_time"].keys():
+                instance.time_offs_lfp_nik = hfile["inferred"]["time_offs_lfp_nik"][()]
+            if "time_offs_lfp_nik" in hfile["lfp_t_start"].keys():
+                instance.lfp_t_start = datetime.datetime.strptime(hfile["inferred"]["lfp_t_start"][()], DATETIME_FORMAT)
+            if "time_offs_lfp_nik" in hfile["nik_t_start"].keys():
+                instance.nik_t_start = datetime.datetime.strptime(hfile["inferred"]["nik_t_start"][()], DATETIME_FORMAT)
+            if "time_offs_lfp_nik" in hfile["lfp_scaling"].keys():
+                instance.lfp_scaling = hfile["inferred"]["lfp_scaling"][()]
+            if "mean_fluo" in hf.keys():
+                instance.mean_fluo = hfile["mean_fluo"][()]
+                instance.nikon_true_length = len(instance.mean_fluo)
 
-            instance.nikon_daq_time = pd.Series(hfile["inferred"]["nikon_daq_time"][()])
-
-            instance.time_offs_lfp_nik = hfile["inferred"]["time_offs_lfp_nik"][()]
-            instance.lfp_t_start = datetime.datetime.strptime(hfile["inferred"]["lfp_t_start"][()], DATETIME_FORMAT)
-            instance.nik_t_start = datetime.datetime.strptime(hfile["inferred"]["nik_t_start"][()], DATETIME_FORMAT)
-            instance.lfp_scaling = hfile["inferred"]["lfp_scaling"][()]
         if try_open_files:  # TODO: could be perfect duplicate of _open_data(). At least part of the code is duplicate
             try:
                 instance.nikon_movie = pims_nd2.ND2_Reader(instance.ND2_PATH)
@@ -721,6 +736,10 @@ class TwoPhotonSession:
         with h5py.File(fpath, "w") as hfile:
             hfile.attrs["creation_time"] = str(datetime.datetime.now())
             hfile.attrs["uuid"] = self.uuid
+
+            if self.nikon_movie is not None:
+                hfile.attrs["nikon_true_length"] = self.nikon_true_length
+                hfile.attrs["nikon_orig_length"] = len(self.nikon_movie)
             if self.mean_fluo is not None:
                 hfile.create_dataset("mean_fluo", data=self.mean_fluo)
             basic_group = hfile.create_group("basic")
