@@ -2,83 +2,128 @@ import labrotation.file_handling as fh
 import os
 import pandas as pd
 
-DATADOC_FOLDER = None
-GROUPING_DF = None  # df containing files belonging together in a session
-SEGMENTATION_DF = None  # df containing segmentation
 
-def setDocumentationFolder(datadoc_folder: str = None):
-    global DATADOC_FOLDER
-    if datadoc_folder is None:
-        DATADOC_FOLDER = fh.open_dir()
-    else:
-        DATADOC_FOLDER = datadoc_folder
-def loadDataDoc():
-    global GROUPING_DF, SEGMENTATION_DF
-    # reset the dataframes
-    GROUPING_DF = None
-    SEGMENTATION_DF = None
-    for root, dirs, files in os.walk(DATADOC_FOLDER):
-        for name in files:
-            if "grouping" in name:
-                if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
-                    raise Exception(
-                        f"Please close all excel files and try again. Found temporary file in:\n{os.path.join(root, name)}")
-                else:
-                    df = pd.read_excel(os.path.join(root, name))
-                    if GROUPING_DF is None:
-                        GROUPING_DF = df
-                    else:
-                        GROUPING_DF = pd.concat(GROUPING_DF, df)
-            elif "segmentation" in name:
-                if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
-                    raise Exception(
-                        f"Please close all excel files and try again. Found temporary file in:\n{os.path.join(root, name)}")
-                else:
-                    df = pd.read_excel(os.path.join(root, name))
-                    if SEGMENTATION_DF is None:
-                        SEGMENTATION_DF = df
-                    else:
-                        SEGMENTATION_DF = pd.concat(SEGMENTATION_DF, df)
+# TODO: a module is less complicated, but setting
+#   %load_ext autoreload
+#   %autoreload 2
+# in jupyter causes module to reload, constantly resetting the folders.
 
-def getUUIDForFileDeprecated(fpath):
-    if os.path.splitext(fpath)[-1] == ".nd2":
-        docu_files_list = []
-        session_uuid = None
-        for root, dirs, files in os.walk(data_docu_folder):
+class DataDocumentation:
+    """
+    SEGMENTS_CNMF_CATS and SEGMENTS_MOCO_CATS assign to each category appearing in the data documentation
+    (segmentation) the boolean value whether the CNMF and MoCo can or should run on segments belonging in that category.
+    These categories should be exactly the unique categories appearing in the [mouse-id]_segmentation.xlsx files, or,
+    once SEGMENTATION_DF contains all this data, in SEGMENTATION_DF["interval_type"].unique().
+    """
+    DATADOC_FOLDER = None
+    GROUPING_DF = None  # df containing files belonging together in a session
+    SEGMENTATION_DF = None  # df containing segmentation
+    SEGMENTS_CNMF_CATS = {"normal": True, "iis": False, "sz": False, "sd_wave": False, "sd_extinction": False,
+                          "fake_handling": False, "sd_wave_delayed": False, "sd_extinction_delayed": False,
+                          "stimulation": False, "sd_wave_cx": False}
+    SEGMENTS_MOCO_CATS = {"normal": True, "iis": True, "sz": True, "sd_wave": True, "sd_extinction": True,
+                          "fake_handling": True, "sd_wave_delayed": True, "sd_extinction_delayed": True,
+                          "stimulation": False, "sd_wave_cx": True}
+
+    def __init__(self, datadoc_folder: str = None):
+        if datadoc_folder is None:
+            self.DATADOC_FOLDER = fh.open_dir("Open data documentation")
+        else:
+            self.DATADOC_FOLDER = datadoc_folder
+
+    def checkCategoryConsistency(self):
+        n_segments = len(self.SEGMENTATION_DF["interval_type"].unique())
+        n_segments_cnmf = len(self.SEGMENTS_CNMF_CATS.keys())
+        n_segments_moco = len(self.SEGMENTS_MOCO_CATS.keys())
+        if n_segments != n_segments_cnmf:
+            raise Exception(
+                f"Found {n_segments} segment types in data documentation: \
+                {self.SEGMENTATION_DF['interval_type'].unique()} vs {n_segments_cnmf} defined in datadoc_util.py\
+                (SEGMENTS_CNMF_CATS): {self.SEGMENTS_CNMF_CATS.keys()}")
+        if n_segments != n_segments_moco:
+            raise Exception(
+                f"Found {n_segments} segment types in data documentation: \
+                           {self.SEGMENTATION_DF['interval_type'].unique()} vs {n_segments_cnmf} defined in datadoc_util.py\
+                           (SEGMENTS_MOCO_CATS): {self.SEGMENTS_MOCO_CATS.keys()}")
+        print("DataDocumentation.checkCategoryConsistency(): Categories seem consistent.")
+
+    def loadDataDocTest(self):
+        for root, dirs, files in os.walk(self.DATADOC_FOLDER):
             for name in files:
                 if "grouping" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
-                        docu_files_list = []
+                        print(os.path.join(root, name))
+                elif "segmentation" in name:
+                    if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
+                        print(os.path.join(root, name))
+
+    def loadDataDoc(self):
+        # reset the dataframes
+        for root, dirs, files in os.walk(self.DATADOC_FOLDER):
+            for name in files:
+                if "grouping" in name:
+                    if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
                         raise Exception(
                             f"Please close all excel files and try again. Found temporary file in:\n{os.path.join(root, name)}")
-                    fpath = os.path.join(root, name)
-                    df = pd.read_excel(fpath)
-                    df = df[df["nd2"] == nd2_fname]
-                    if len(df) > 0:
-                        if len(df) > 1:
-                            raise Exception(
-                                f"File name appears several times in data documentation:\n\t{nd2_fname}\n{df}")
+                    else:
+                        df = pd.read_excel(os.path.join(root, name))
+                        if self.GROUPING_DF is None:
+                            self.GROUPING_DF = df
                         else:
-                            session_uuid = df["uuid"].iloc[0]
-                        break
-                    docu_files_list.append(fpath)
-        if session_uuid is None:
-            session_uuid = uuid.uuid4().hex
-            warnings.warn(
-                f"Warning: movie does not have entry (uuid) in data documentation!\nYou should add data to documentation. The generated uuid for this session is: {session_uuid}",
-                UserWarning)
-        print(f"UUID is {session_uuid}")
-        return session_uuid
-    else:
-        raise NotImplementedError("getUUIDForFile() only implemented for nd2 files so far.")
+                            self.GROUPING_DF = pd.concat([self.GROUPING_DF, df])
+                elif "segmentation" in name:
+                    if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
+                        raise Exception(
+                            f"Please close all excel files and try again. Found temporary file in:\n{os.path.join(root, name)}")
+                    else:
+                        df = pd.read_excel(os.path.join(root, name))
+                        if self.SEGMENTATION_DF is None:
+                            self.SEGMENTATION_DF = df
+                        else:
+                            self.SEGMENTATION_DF = pd.concat([self.SEGMENTATION_DF, df])
 
-def getUUIDForFile(fpath):
-    fname = os.path.split(fpath)[-1]
-    global GROUPING_DF
-    df = GROUPING_DF[GROUPING_DF["nd2"] == fname]
-    return df["uuid"]
+    def getUUIDForFileDeprecated(self, nd2_fname, data_docu_folder):
+        if os.path.splitext(nd2_fname)[-1] == ".nd2":
+            docu_files_list = []
+            session_uuid = None
+            for root, dirs, files in os.walk(data_docu_folder):
+                for name in files:
+                    if "grouping" in name:
+                        if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
+                            docu_files_list = []
+                            raise Exception(
+                                f"Please close all excel files and try again. Found temporary file in:\n{os.path.join(root, name)}")
+                        fpath = os.path.join(root, name)
+                        df = pd.read_excel(fpath)
+                        df = df[df["nd2"] == nd2_fname]
+                        if len(df) > 0:
+                            if len(df) > 1:
+                                raise Exception(
+                                    f"File name appears several times in data documentation:\n\t{nd2_fname}\n{df}")
+                            else:
+                                session_uuid = df["uuid"].iloc[0]
+                            break
+                        docu_files_list.append(fpath)
+            if session_uuid is None:
+                session_uuid = uuid.uuid4().hex
+                warnings.warn(
+                    f"Warning: movie does not have entry (uuid) in data documentation!\nYou should add data to documentation. The generated uuid for this session is: {session_uuid}",
+                    UserWarning)
+            print(f"UUID is {session_uuid}")
+            return session_uuid
+        else:
+            raise NotImplementedError("getUUIDForFile() only implemented for nd2 files so far.")
 
+    def getUUIDForFile(self, fpath):
+        fname = os.path.split(fpath)[-1]
+        df = self.GROUPING_DF[self.GROUPING_DF["nd2"] == fname]
+        if len(df) > 1:
+            raise Exception("nd2 file is not unique!")
+        return df["uuid"].iat[0]
 
+    def getSegments(self, nd2_file):
+        assert os.path.splitext(nd2_file)[-1] == ".nd2"
+        return self.SEGMENTATION_DF[self.SEGMENTATION_DF["nd2"] == nd2_file]
 
-def getSessionFiles():
-    pass
+    def getSessionFiles(self):
+        pass
