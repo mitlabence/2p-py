@@ -2,6 +2,8 @@ Tips for pycharm:
 create a conda environment using 2p-py-env.txt. It will install almost all packages except the list below.
 Set this to the project interpreter in PyCharm. It might still run the default anaconda interpreter, and throw errors while importing stuff. Set the correct interpeter in the project configurations!
 
+conda install statsmodels
+conda install multiprocess  # alternative to multiprocessing that works with IPython (Jupyter notebook, presumably also anaconda prompt). https://stackoverflow.com/questions/41385708/multiprocessing-example-giving-attributeerror
 
 pip install pyabf  (2.3.7)
 pip install pims_nd2  (1.1)

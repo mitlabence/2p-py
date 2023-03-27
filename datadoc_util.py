@@ -124,6 +124,20 @@ class DataDocumentation:
     def getSegments(self, nd2_file):
         assert os.path.splitext(nd2_file)[-1] == ".nd2"
         return self.SEGMENTATION_DF[self.SEGMENTATION_DF["nd2"] == nd2_file]
+    def getSegmentsForUUID(self, uuid, as_df=True):
+        nd2_file =  self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].nd2.values[0]
+        segments_df =  self.SEGMENTATION_DF[self.SEGMENTATION_DF["nd2"] == nd2_file]
+        segments_df = segments_df.drop("nd2", axis=1)
+        if as_df:
+            return segments_df
+        else:
+            ival_type = segments_df["interval_type"].array
+            fbegin = segments_df["frame_begin"].array
+            fend = segments_df["frame_end"].array
+            segments = []
+            for i in range(len(ival_type)):
+                segments.append((ival_type[i], fbegin[i], fend[i]))
+            return segments
 
     def getSessionFiles(self):
         pass
