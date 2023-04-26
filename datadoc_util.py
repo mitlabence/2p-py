@@ -18,10 +18,11 @@ class DataDocumentation:
     DATADOC_FOLDER = None
     GROUPING_DF = None  # df containing files belonging together in a session
     SEGMENTATION_DF = None  # df containing segmentation
-    SEGMENTS_CNMF_CATS = {"normal": True, "iis": False, "sz": False, "sd_wave": False, "sd_extinction": False,
+    WIN_INJ_TYPES_DF = None  # df containing window side, type, injection side, type.
+    SEGMENTS_CNMF_CATS = {"normal": True, "iis": False, "sz": False, "sz_like": False, "sd_wave": False, "sd_extinction": False,
                           "fake_handling": False, "sd_wave_delayed": False, "sd_extinction_delayed": False,
                           "stimulation": False, "sd_wave_cx": False}
-    SEGMENTS_MOCO_CATS = {"normal": True, "iis": True, "sz": True, "sd_wave": True, "sd_extinction": True,
+    SEGMENTS_MOCO_CATS = {"normal": True, "iis": True, "sz": True, "sz_like": True, "sd_wave": True, "sd_extinction": True,
                           "fake_handling": True, "sd_wave_delayed": True, "sd_extinction_delayed": True,
                           "stimulation": False, "sd_wave_cx": True}
 
@@ -67,6 +68,8 @@ class DataDocumentation:
                             f"Please close all excel files and try again. Found temporary file in:\n{os.path.join(root, name)}")
                     else:
                         df = pd.read_excel(os.path.join(root, name))
+                        mouse_id = os.path.splitext(name)[0].split("_")[0]  # get rid of extension, then split xy_grouping to get xy
+                        df["mouse_id"] = mouse_id
                         if self.GROUPING_DF is None:
                             self.GROUPING_DF = df
                         else:
@@ -81,6 +84,14 @@ class DataDocumentation:
                             self.SEGMENTATION_DF = df
                         else:
                             self.SEGMENTATION_DF = pd.concat([self.SEGMENTATION_DF, df])
+                elif name == "window_injection_types_sides.xlsx":
+                    self.WIN_INJ_TYPES_DF = pd.read_excel(os.path.join(root, name))
+
+    def getIdUuid(self):
+        if self.GROUPING_DF is not None:
+            return self.GROUPING_DF[["mouse_id", "uuid"]]
+        else:
+            raise Exception("datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate DataDocumentation object")
 
     def getUUIDForFileDeprecated(self, nd2_fname, data_docu_folder):
         if os.path.splitext(nd2_fname)[-1] == ".nd2":
@@ -114,6 +125,20 @@ class DataDocumentation:
         else:
             raise NotImplementedError("getUUIDForFile() only implemented for nd2 files so far.")
 
+    def getMouseWinInjInfo(self, mouse_id):
+        return self.WIN_INJ_TYPES_DF[self.WIN_INJ_TYPES_DF["mouse_id"] == mouse_id]
+    
+    def getInjectionDirection(self, mouse_id):
+        inj_side = self.WIN_INJ_TYPES_DF[self.WIN_INJ_TYPES_DF["mouse_id"] == mouse_id]["injection_side"].values[0]
+        win_side = self.WIN_INJ_TYPES_DF[self.WIN_INJ_TYPES_DF["mouse_id"] == mouse_id]["window_side"].values[0]
+        top_dir = self.getTopDirection(mouse_id)
+        # assert the injection side is opposite to the window side
+        if (inj_side == "right" and win_side == "left") or (inj_side == "left" and win_side == "right"):
+            # if imaging contralateral to injection, injection is always towards medial side
+            return "top" if top_dir == "medial" else "bottom"
+        else:  # some mice have window on both hemispheres
+            raise NotImplementedError("datadoc_util: getInjectionDirection: only left and right windows, contralateral injections have been implemented.")
+    
     def getUUIDForFile(self, fpath):
         fname = os.path.split(fpath)[-1]
         df = self.GROUPING_DF[self.GROUPING_DF["nd2"] == fname]
@@ -141,3 +166,11 @@ class DataDocumentation:
 
     def getSessionFiles(self):
         pass
+    def getTopDirection(self, mouse_id):
+        # push right button: mouse goes forward, imaging field goes right (cells go left). This means that 
+        # right: posterior, left: anterior.
+        # Depending on window side:
+        # left window: up=towards medial, down: towards lateral
+        # right window: up=towards lateral, down: towards medial
+        window_side_top_dir_dict = {"left": "medial", "right": "lateral"}
+        return window_side_top_dir_dict[self.getMouseWinInjInfo(mouse_id)["window_side"].values[0]]
