@@ -1,7 +1,7 @@
 import labrotation.file_handling as fh
 import os
 import pandas as pd
-
+from collections.abc import Iterable
 
 # TODO: a module is less complicated, but setting
 #   %load_ext autoreload
@@ -19,10 +19,12 @@ class DataDocumentation:
     GROUPING_DF = None  # df containing files belonging together in a session
     SEGMENTATION_DF = None  # df containing segmentation
     WIN_INJ_TYPES_DF = None  # df containing window side, type, injection side, type.
-    SEGMENTS_CNMF_CATS = {"normal": True, "iis": False, "sz": False, "sz_like": False, "sd_wave": False, "sd_extinction": False,
+    SEGMENTS_CNMF_CATS = {"normal": True, "iis": False, "sz": False, "sz_like": False, "sd_wave": False,
+                          "sd_extinction": False,
                           "fake_handling": False, "sd_wave_delayed": False, "sd_extinction_delayed": False,
                           "stimulation": False, "sd_wave_cx": False}
-    SEGMENTS_MOCO_CATS = {"normal": True, "iis": True, "sz": True, "sz_like": True, "sd_wave": True, "sd_extinction": True,
+    SEGMENTS_MOCO_CATS = {"normal": True, "iis": True, "sz": True, "sz_like": True, "sd_wave": True,
+                          "sd_extinction": True,
                           "fake_handling": True, "sd_wave_delayed": True, "sd_extinction_delayed": True,
                           "stimulation": False, "sd_wave_cx": True}
 
@@ -68,7 +70,8 @@ class DataDocumentation:
                             f"Please close all excel files and try again. Found temporary file in:\n{os.path.join(root, name)}")
                     else:
                         df = pd.read_excel(os.path.join(root, name))
-                        mouse_id = os.path.splitext(name)[0].split("_")[0]  # get rid of extension, then split xy_grouping to get xy
+                        mouse_id = os.path.splitext(name)[0].split("_")[
+                            0]  # get rid of extension, then split xy_grouping to get xy
                         df["mouse_id"] = mouse_id
                         if self.GROUPING_DF is None:
                             self.GROUPING_DF = df
@@ -91,7 +94,8 @@ class DataDocumentation:
         if self.GROUPING_DF is not None:
             return self.GROUPING_DF[["mouse_id", "uuid"]]
         else:
-            raise Exception("datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate DataDocumentation object")
+            raise Exception(
+                "datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate DataDocumentation object")
 
     def getUUIDForFileDeprecated(self, nd2_fname, data_docu_folder):
         if os.path.splitext(nd2_fname)[-1] == ".nd2":
@@ -125,9 +129,12 @@ class DataDocumentation:
         else:
             raise NotImplementedError("getUUIDForFile() only implemented for nd2 files so far.")
 
+    def getMouseIdForUuid(self, uuid):  # TODO: handle invalid uuid
+        return self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].mouse_id.values[0]
+
     def getMouseWinInjInfo(self, mouse_id):
         return self.WIN_INJ_TYPES_DF[self.WIN_INJ_TYPES_DF["mouse_id"] == mouse_id]
-    
+
     def getInjectionDirection(self, mouse_id):
         inj_side = self.WIN_INJ_TYPES_DF[self.WIN_INJ_TYPES_DF["mouse_id"] == mouse_id]["injection_side"].values[0]
         win_side = self.WIN_INJ_TYPES_DF[self.WIN_INJ_TYPES_DF["mouse_id"] == mouse_id]["window_side"].values[0]
@@ -137,8 +144,9 @@ class DataDocumentation:
             # if imaging contralateral to injection, injection is always towards medial side
             return "top" if top_dir == "medial" else "bottom"
         else:  # some mice have window on both hemispheres
-            raise NotImplementedError("datadoc_util: getInjectionDirection: only left and right windows, contralateral injections have been implemented.")
-    
+            raise NotImplementedError(
+                "datadoc_util: getInjectionDirection: only left and right windows, contralateral injections have been implemented.")
+
     def getUUIDForFile(self, fpath):
         fname = os.path.split(fpath)[-1]
         df = self.GROUPING_DF[self.GROUPING_DF["nd2"] == fname]
@@ -149,9 +157,10 @@ class DataDocumentation:
     def getSegments(self, nd2_file):
         assert os.path.splitext(nd2_file)[-1] == ".nd2"
         return self.SEGMENTATION_DF[self.SEGMENTATION_DF["nd2"] == nd2_file]
+
     def getSegmentsForUUID(self, uuid, as_df=True):
-        nd2_file =  self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].nd2.values[0]
-        segments_df =  self.SEGMENTATION_DF[self.SEGMENTATION_DF["nd2"] == nd2_file]
+        nd2_file = self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].nd2.values[0]
+        segments_df = self.SEGMENTATION_DF[self.SEGMENTATION_DF["nd2"] == nd2_file]
         segments_df = segments_df.drop("nd2", axis=1)
         if as_df:
             return segments_df
@@ -166,6 +175,7 @@ class DataDocumentation:
 
     def getSessionFiles(self):
         pass
+
     def getTopDirection(self, mouse_id):
         # push right button: mouse goes forward, imaging field goes right (cells go left). This means that 
         # right: posterior, left: anterior.
@@ -174,3 +184,45 @@ class DataDocumentation:
         # right window: up=towards lateral, down: towards medial
         window_side_top_dir_dict = {"left": "medial", "right": "lateral"}
         return window_side_top_dir_dict[self.getMouseWinInjInfo(mouse_id)["window_side"].values[0]]
+
+    def addUUIDColumnFromNd2(self, df):
+        """
+        Purpose: when returning dataframe, useful to add uuid column instead of only specifying nd2 files.
+        This function adds the uuid column to a dataframe (e.g. self.SEGMENTATION_DF)
+        :param df:
+        :return:
+        """
+        assert "nd2" in df.columns
+        if "uuid" not in df.columns:
+            df["uuid"] = df.apply(lambda row: self.GROUPING_DF[self.GROUPING_DF["nd2"] == row["nd2"]].uuid.values[0], axis=1)
+        else:
+            print("datadoc_util addUUIDColumnFromNd2: uuid column already exists! Returning unchanged dataframe...")
+        return df
+
+
+    def getAllSegmentsWithType(self, segment_type = "normal", experiment_type: str="tmev"):
+        """
+        Returns all segments in the data documentation that have the defined segment type(s)
+        :param segment_type: string or list of strings.
+        :param experiment_type: string or list of strings. only take recordings that fall into this category (see data grouping). Example: "tmev", "tmev_bl", "chr2_szsd"
+        :return:
+        """
+
+        # convert possible string
+        if type(segment_type) is str:
+            segment_types = [segment_type]
+        else:  # assume otherwise list of strings was given
+            segment_types = segment_type
+
+        if type(experiment_type) is str:
+            experiment_types = [experiment_type]
+        else:
+            experiment_types = experiment_type
+        exptype_unique = self.GROUPING_DF.experiment_type.unique()
+        for e_type in experiment_types:  # cannot do for element in experiment_types
+            assert e_type in exptype_unique
+
+        res_df = self.addUUIDColumnFromNd2(self.SEGMENTATION_DF[self.SEGMENTATION_DF["interval_type"].isin(segment_types)])
+        res_df["experiment_type"] = res_df.apply(lambda row: self.GROUPING_DF[self.GROUPING_DF["nd2"] == row["nd2"]].experiment_type.values[0], axis=1)
+        res_df = res_df[res_df["experiment_type"].isin(experiment_types)]
+        return res_df #.drop("experiment_type")
