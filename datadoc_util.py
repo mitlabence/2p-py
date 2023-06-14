@@ -64,7 +64,6 @@ class DataDocumentation:
         # reset the dataframes
         for root, dirs, files in os.walk(self.DATADOC_FOLDER):
             for name in files:
-                print(name)
                 if "grouping" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
                         raise Exception(
