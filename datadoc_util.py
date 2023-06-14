@@ -64,6 +64,7 @@ class DataDocumentation:
         # reset the dataframes
         for root, dirs, files in os.walk(self.DATADOC_FOLDER):
             for name in files:
+                print(name)
                 if "grouping" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
                         raise Exception(
@@ -89,6 +90,9 @@ class DataDocumentation:
                             self.SEGMENTATION_DF = pd.concat([self.SEGMENTATION_DF, df])
                 elif name == "window_injection_types_sides.xlsx":
                     self.WIN_INJ_TYPES_DF = pd.read_excel(os.path.join(root, name))
+        if self.WIN_INJ_TYPES_DF is None:
+            raise Exception(f"Error: window_injection_types_sides.xlsx was not found in data documentation! \
+            Possible reason is the changed structure of data documentation. This file was moved out of 'documentation'. Do not move it back!")
 
     def getIdUuid(self):
         if self.GROUPING_DF is not None:
@@ -226,3 +230,10 @@ class DataDocumentation:
         res_df["experiment_type"] = res_df.apply(lambda row: self.GROUPING_DF[self.GROUPING_DF["nd2"] == row["nd2"]].experiment_type.values[0], axis=1)
         res_df = res_df[res_df["experiment_type"].isin(experiment_types)]
         return res_df #.drop("experiment_type")
+    def getNikonFileNameUuid(self):
+        if self.GROUPING_DF is not None:
+            return self.GROUPING_DF[["nd2", "uuid"]]
+        else:
+            raise Exception(
+                "datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate "
+                "DataDocumentation object")
