@@ -445,10 +445,11 @@ class TwoPhotonSession:
         match_type: "Nikon" or "zero". "Nikon": match (cut) to the Nikon frames (NIDAQ time stamps). "zero": match to
         0 s, and the last Nikon frame.
         """
-        cut_begin = 0.0
         cut_end = self.nikon_daq_time.iloc[-1]
         if match_type == "Nikon":  # TODO: match_type does not explain its own function
             cut_begin = self.nikon_daq_time.iloc[0]
+        else:
+            cut_begin = 0.0
         self._create_lfp_df(self.time_offs_lfp_nik - seconds, cut_begin, cut_end)
         self.time_offs_lfp_nik = self.time_offs_lfp_nik - seconds
 
@@ -483,10 +484,17 @@ class TwoPhotonSession:
 
             # FIXME: correcting for time offset is not enough! The nikon DAQ time also does not start from 0!
 
-            time_offs_lfp_nik = nik_t_start - lfp_t_start
-            time_offset_sec = time_offs_lfp_nik.seconds
+            # avoid deltatime issue: when earlier - later, the delta time will be negative days, huge number of hours.
+            # For example: -1 days, 23:59:59 hours.
+            if nik_t_start > lfp_t_start:
+                sign = 1.0
+            else:
+                sign = -1.0
 
-            time_offs_lfp_nik = time_offset_sec + (time_offs_lfp_nik.microseconds * 1e-6)
+            time_offs_lfp_nik = abs(nik_t_start - lfp_t_start)
+            time_offset_sec = sign*time_offs_lfp_nik.seconds
+
+            time_offs_lfp_nik = time_offset_sec + (sign*time_offs_lfp_nik.microseconds * 1e-6)
 
             # stop process if too much time detected between starting LFP and Nikon recording.
             if time_offs_lfp_nik > 30.0:
