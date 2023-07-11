@@ -9,6 +9,7 @@ pip install pyabf  (2.3.7)
 pip install pims_nd2  (1.1)
 pip install numba (or conda install numba) (0.56.4)
 pip install tables (for pandas df.to_hdf() )
+pip install pyedflib (0.1.33)
 
 Other:
 Install matlab engine for python. See Test Matlab Integration notebook.
