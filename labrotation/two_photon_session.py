@@ -604,7 +604,11 @@ class TwoPhotonSession:
             self.lfp_df, self.lfp_df_cut = None, None
 
         # now nd2_to_caiman.py
-
+    def has_lfp(self):
+        if self.lfp_df is not None:
+            return True
+        else:
+            return False
     def get_nikon_data(self, i_begin: int = None, i_end: int = None) -> np.array:
         """
         :param i_begin: 0-indexed first frame to get
