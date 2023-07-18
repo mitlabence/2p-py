@@ -242,7 +242,8 @@ class TwoPhotonSession:
 
     @classmethod
     def from_hdf5(cls, fpath: str, try_open_files: bool = True):
-        # TODO: make it work with new structure of export_hdf5, incl. omitting dataframes for saving (these should be easy to recreate) if the proper flag was not set.
+        # TODO: make it work with new structure of export_hdf5, incl. omitting dataframes for saving (these should be
+        #  easy to recreate) if the proper flag was not set.
         # TODO: handle exceptions (missing data)
 
         with h5py.File(fpath, "r") as hfile:
@@ -324,7 +325,8 @@ class TwoPhotonSession:
         if self.ND2_PATH is not None:
             self.nikon_movie = pims_nd2.ND2_Reader(self.ND2_PATH)
             self.nikon_true_length = self._find_nd2_true_length()
-            # TODO: nikon_movie should be closed properly upon removing this class (or does the reference counter take care of it?)
+            # TODO: nikon_movie should be closed properly upon removing this class (or does the reference counter
+            #  take care of it?)
         if self.ND2_TIMESTAMPS_PATH is not None:
             try:
                 self.nikon_meta = self.drop_nan_cols(
@@ -453,6 +455,24 @@ class TwoPhotonSession:
         self._create_lfp_df(self.time_offs_lfp_nik - seconds, cut_begin, cut_end)
         self.time_offs_lfp_nik = self.time_offs_lfp_nik - seconds
 
+    def nikon_time_stamp(self, i_frame):
+        """
+        Given the 0-indexed i_frame of the Nikon recording, return the time stamp associated with it in UTC. Raises
+        Exception if i_frame is not in the valid range.
+        :param i_frame: 0-indexed frame in range [0, <length of Nikon movie>]
+        :return: datetime object of time stamp for frame.
+        """
+        tzone_utc = pytz.utc
+        if (i_frame < len(self.nikon_movie)) and (i_frame >= 0):
+            t_start = tzone_utc.localize(self.nikon_movie.metadata["time_start_utc"])
+            dt_ms = datetime.timedelta(milliseconds=self.nikon_movie[i_frame].metadata["t_ms"])
+            return t_start + dt_ms
+        else:
+            raise Exception(
+                f"TwoPhotonSession nikon_time_stamp(i_frame): i_frame ({i_frame}) out of range [0, "
+                f"{len(self.nikon_movie) - 1}]")
+        pass
+
     # TODO: this does not actually matches the two, but gets the offset for matching
     def _match_lfp_nikon_stamps(self) -> None:
         if hasattr(self, "lfp_file") and self.lfp_file is not None and self.nikon_movie is not None:
@@ -465,7 +485,8 @@ class TwoPhotonSession:
             try:
                 nik_t_start: datetime.datetime = tzone_utc.localize(
                     self.nikon_movie.metadata["time_start_utc"])
-            except Exception as e:  # in case of exception, a corruption might have happened, so last part of metadata is missing.
+            except Exception as e:  # in case of exception, a corruption might have happened, so last part of
+                # metadata is missing.
                 # code of @property metadata() from nd2reader.py (pims_nd2)
                 warnings.warn(
                     "Error reading out metadata of nd2. Recording might be corrupted; most likely\
@@ -492,9 +513,9 @@ class TwoPhotonSession:
                 sign = -1.0
 
             time_offs_lfp_nik = abs(nik_t_start - lfp_t_start)
-            time_offset_sec = sign*time_offs_lfp_nik.seconds
+            time_offset_sec = sign * time_offs_lfp_nik.seconds
 
-            time_offs_lfp_nik = time_offset_sec + (sign*time_offs_lfp_nik.microseconds * 1e-6)
+            time_offs_lfp_nik = time_offset_sec + (sign * time_offs_lfp_nik.microseconds * 1e-6)
 
             # stop process if too much time detected between starting LFP and Nikon recording.
             if time_offs_lfp_nik > 30.0:
@@ -522,7 +543,8 @@ class TwoPhotonSession:
                 try:
                     fr = self.nikon_movie[i]
                     frame_read_success = True
-                    # TODO: could just return the detected length here. Not sure about asynchronous events (is Exception caught immediately?)
+                    # TODO: could just return the detected length here. Not sure about asynchronous events (is
+                    #  Exception caught immediately?)
                 except Exception:  # TODO: separate KeyboardInterrupt!
                     i -= 1
                     frame_read_success = False
@@ -604,11 +626,13 @@ class TwoPhotonSession:
             self.lfp_df, self.lfp_df_cut = None, None
 
         # now nd2_to_caiman.py
+
     def has_lfp(self):
         if self.lfp_df is not None:
             return True
         else:
             return False
+
     def get_nikon_data(self, i_begin: int = None, i_end: int = None) -> np.array:
         """
         :param i_begin: 0-indexed first frame to get
@@ -761,7 +785,8 @@ class TwoPhotonSession:
                 "ND2_TIMESTAMPS_PATH"] = self.ND2_TIMESTAMPS_PATH if self.ND2_TIMESTAMPS_PATH is not None else ""
             basic_group["LABVIEW_PATH"] = self.LABVIEW_PATH if self.LABVIEW_PATH is not None else ""
             basic_group[
-                "LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH if self.LABVIEW_TIMESTAMPS_PATH is not None else ""
+                "LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH if self.LABVIEW_TIMESTAMPS_PATH is not None\
+                else ""
             basic_group["LFP_PATH"] = self.LFP_PATH if self.LFP_PATH is not None else ""
             basic_group["MATLAB_2P_FOLDER"] = self.MATLAB_2P_FOLDER if self.MATLAB_2P_FOLDER is not None else ""
             # implied parameters
@@ -837,7 +862,8 @@ class TwoPhotonSession:
             return np.array([])
         except Exception:
             warnings.warn(
-                "Error reading out nd2 file; it seems to be corrupted. It might be possible to save it to tiff using the nikon software, and calculate the mean from that.")
+                "Error reading out nd2 file; it seems to be corrupted. It might be possible to save it to tiff using "
+                "the nikon software, and calculate the mean from that.")
 
     def infer_labview_timestamps(self):
         """
@@ -1363,7 +1389,8 @@ def nb_view_patches_manual_control_NOTWORKING(Yr, A, C, b, f, d1, d2,
         #              column(plot1, plot2), plot))
         raise NotImplementedError("Y_r.shape[0] !> 1. This case has not been implemented yet.")
 
-    # slider.js_on_change('value', slider_callback)  # FIXME: this line of code is messing up the whole function. What is wrong with callback?
+    # slider.js_on_change('value', slider_callback)  # FIXME: this line of code is messing up the whole function.
+    #  What is wrong with callback?
 
     dropdown_code = """
             var cats_orig = categories.data['cats'];
@@ -1373,13 +1400,16 @@ def nb_view_patches_manual_control_NOTWORKING(Yr, A, C, b, f, d1, d2,
             // Change slider values
             if (this.item == 'accepted') { // show originally accepted
                 const n_accepted = categories.data['cats'].reduce((a, b) => a + b, 0);
-                // Create an empty array for the indices of accepted components. array[i] = index of i-th accepted neuron.
+                // Create an empty array for the indices of accepted components. array[i] = index of i-th accepted 
+                neuron.
                 var accepted_indices = [];
                 accepted_indices.length = n_accepted; 
                 accepted_indices.fill(0);
                 // TODO: need to get list of indices in categories that are non-zero. Iterate through categories,
-                // if element is non-zero, change next element in accepted_indices to the value. Increment accepted_indices pointer.
-                // If this kind of rebuilding is too slow, can create more data sources, and change them every time we change neuron classification.
+                // if element is non-zero, change next element in accepted_indices to the value. Increment 
+                accepted_indices pointer.
+                // If this kind of rebuilding is too slow, can create more data sources, and change them every time 
+                we change neuron classification.
                 var i_current = 0; // pointer to first  empty position in accepted_indices 
                 for (var i = 0; i < cats_orig.length; i++) {
                     if (cats_orig[i] > 0) { // the component was accepted originally 
@@ -1455,8 +1485,10 @@ def nb_view_patches_manual_control_NOTWORKING(Yr, A, C, b, f, d1, d2,
 
     # on pressing transfer, change the current category of the neuron.
     on_transfer_pressed = CustomJS(
-        args={'transfer_button': transfer_button, 'curr_cat': categories_new, 'btn_curr_cat': current_status,
-              'slider': slider}, code="""
+        args={
+            'transfer_button': transfer_button, 'curr_cat': categories_new, 'btn_curr_cat': current_status,
+            'slider'         : slider
+        }, code="""
     var i_cell = slider.value - 1
     var cats_new = curr_cat.data['cats'];
     console.log(String(i_cell));
@@ -1502,8 +1534,11 @@ def nb_view_patches_manual_control_NOTWORKING(Yr, A, C, b, f, d1, d2,
     bpl.show(layout([[slider, transfer_button, btn_idx, original_status, current_status, dropdown, save_button]]))
     # return Y_r
 
-    # TODO: create save button to write results to a txt file. See https://stackoverflow.com/questions/54215667/bokeh-click-button-to-save-widget-values-to-txt-file-using-javascript
-    # and https://stackoverflow.com/questions/62290866/python-bokeh-applicationunable-to-export-updated-data-from-webapp-to-local-syst
+    # TODO: create save button to write results to a txt file. See
+    #  https://stackoverflow.com/questions/54215667/bokeh-click-button-to-save-widget-values-to-txt-file-using
+    #  -javascript
+    # and https://stackoverflow.com/questions/62290866/python-bokeh-applicationunable-to-export-updated-data-from
+    # -webapp-to-local-syst
     return out_fname
 
 
@@ -1726,8 +1761,10 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
                         code=slider_code)
     # on pressing transfer, change the current category of the neuron.
     on_transfer_pressed = CustomJS(
-        args={'curr_cat': categories_new, 'btn_curr_cat': btn_current_status,
-              'slider': slider}, code="""
+        args={
+            'curr_cat': categories_new, 'btn_curr_cat': btn_current_status,
+            'slider'  : slider
+        }, code="""
            var i_cell = slider.value - 1
            var cats_new = curr_cat.data['cats'];
            console.log(String(i_cell));
@@ -1745,8 +1782,10 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
            """)
 
     save_data_callback = CustomJS(
-        args={'new_cats': categories_new, 'index_map': index_map, 'out_fname': out_fname,
-              'category_original': category_original},
+        args={
+            'new_cats'         : categories_new, 'index_map': index_map, 'out_fname': out_fname,
+            'category_original': category_original
+        },
         code=
         """
         const cat_orig = category_original.data['cat'];
@@ -1781,8 +1820,11 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
                      row(plot1 if r_values is None else column(plot1, plot2), plot)]))
     # return Y_r
 
-    # TODO: create save button to write results to a txt file. See https://stackoverflow.com/questions/54215667/bokeh-click-button-to-save-widget-values-to-txt-file-using-javascript
-    # and https://stackoverflow.com/questions/62290866/python-bokeh-applicationunable-to-export-updated-data-from-webapp-to-local-syst
+    # TODO: create save button to write results to a txt file. See
+    #  https://stackoverflow.com/questions/54215667/bokeh-click-button-to-save-widget-values-to-txt-file-using
+    #  -javascript
+    # and https://stackoverflow.com/questions/62290866/python-bokeh-applicationunable-to-export-updated-data-from
+    # -webapp-to-local-syst
     return out_fname
 
 
@@ -1896,7 +1938,8 @@ def nb_view_components_manual_control(estimates,
             :param estimates:
 
 		mode: string, one of ["all", "rejected", "accepted"]  # "modified" is also a category but it would be empty
-			Whether to go through accepted components and reject manually ("accepted" or reject"), or go through rejected components and move manually to accepted ("rejected" or "accept").
+			Whether to go through accepted components and reject manually ("accepted" or reject"), or go through
+			rejected components and move manually to accepted ("rejected" or "accept").
     """
     from matplotlib import pyplot as plt
     import scipy
@@ -1935,7 +1978,8 @@ def nb_view_components_manual_control(estimates,
         idx = estimates.idx_components
     else:
         raise NotImplementedError(
-            "Only accepted and rejected modes are supported. The reason for lack of showing all components, for example, is a limitation in javascript.")
+            "Only accepted and rejected modes are supported. The reason for lack of showing all components, "
+            "for example, is a limitation in javascript.")
     n_neurons = len(idx)
     out_fname = nb_view_patches_manual_control(
         Yr, estimates.A.tocsc()[:, idx], estimates.C[idx], estimates.b, estimates.f,
