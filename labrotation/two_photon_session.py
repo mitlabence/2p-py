@@ -182,14 +182,14 @@ class TwoPhotonSession:
         if instance.belt_dict is not None:
             for k, v in instance.belt_dict.items():
                 instance.belt_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_dict[k])
-            instance.belt_dict["dt"] = instance._lv_dt(belt_dict["time"])
-            instance.belt_dict["dt_tsscn"] = instance._lv_dt(belt_dict["tsscn"])
+            instance.belt_dict["dt"] = instance._lv_dt(instance.belt_dict["time"])
+            #instance.belt_dict["dt_tsscn"] = instance._lv_dt(instance.belt_dict["tsscn"])
             instance.belt_dict["totdist_abs"] = instance._lv_totdist_abs(instance.belt_dict["speed"],
                                                                          instance.belt_dict["dt"])
         if instance.belt_scn_dict is not None:
             for k, v in instance.belt_scn_dict.items():
                 instance.belt_scn_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_scn_dict[k])
-            instance.belt_scn_dict["dt"] = instance._lv_dt(belt_scn_dict["tsscn"])
+            instance.belt_scn_dict["dt"] = instance._lv_dt(instance.belt_scn_dict["tsscn"])
             instance.belt_scn_dict["totdist_abs"] = instance._lv_totdist_abs(instance.belt_scn_dict["speed"],
                                                                              instance.belt_scn_dict["dt"])
         if instance.nikon_meta is not None:
