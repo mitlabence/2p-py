@@ -182,9 +182,16 @@ class TwoPhotonSession:
         if instance.belt_dict is not None:
             for k, v in instance.belt_dict.items():
                 instance.belt_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_dict[k])
+            instance.belt_dict["dt"] = instance._lv_dt(belt_dict["time"])
+            instance.belt_dict["dt_tsscn"] = instance._lv_dt(belt_dict["tsscn"])
+            instance.belt_dict["totdist_abs"] = instance._lv_totdist_abs(instance.belt_dict["speed"],
+                                                                         instance.belt_dict["dt"])
         if instance.belt_scn_dict is not None:
             for k, v in instance.belt_scn_dict.items():
                 instance.belt_scn_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_scn_dict[k])
+            instance.belt_scn_dict["dt"] = instance._lv_dt(belt_scn_dict["tsscn"])
+            instance.belt_scn_dict["totdist_abs"] = instance._lv_totdist_abs(instance.belt_scn_dict["speed"],
+                                                                             instance.belt_scn_dict["dt"])
         if instance.nikon_meta is not None:
             instance._nikon_remove_na()
         instance._create_nikon_daq_time()  # defines self.nikon_daq_time
@@ -439,6 +446,32 @@ class TwoPhotonSession:
             else:  # something went really wrong!
                 raise ValueError(
                     f"nikon_daq_time has unsupported data type: {type(self.nikon_daq_time.iloc[0])}")
+
+    def _lv_totdist_abs(self, speed, dt) -> np.array:
+        """
+        Create a true total distance statistic. totdist from labview integrates the distance with sign, i.e. the total
+        distance is reduced with backwards locomotion.
+        :return: numpy array
+        """
+        assert len(speed) == len(dt)
+        totdist_abs = np.zeros(len(speed))
+        totdist_abs[0] = speed[0]*dt[0]
+        for i in range(1, len(totdist_abs)):
+            totdist_abs[i] = totdist_abs[i - 1] + abs(speed[i] * dt[i])
+        return totdist_abs
+
+    def _lv_dt(self, t)  -> np.array:
+        """
+        Create new array with entry i = t[i] - t[i-1], with dt[0] = 0
+        :param t: a time series. 1d numpy array
+        :return: numpy array with dt entries, same length as t
+        """
+        t1 = t[1:]
+        t0 = t[:-1]
+        dt = np.zeros(len(t))
+        dt[1:] = t1 - t0
+        dt[0] = dt[1]  # assume same time step to avoid having a 0.
+        return dt
 
     def shift_lfp(self, seconds: float = 0.0, match_type: str = "Nikon") -> None:
         """
@@ -785,7 +818,7 @@ class TwoPhotonSession:
                 "ND2_TIMESTAMPS_PATH"] = self.ND2_TIMESTAMPS_PATH if self.ND2_TIMESTAMPS_PATH is not None else ""
             basic_group["LABVIEW_PATH"] = self.LABVIEW_PATH if self.LABVIEW_PATH is not None else ""
             basic_group[
-                "LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH if self.LABVIEW_TIMESTAMPS_PATH is not None\
+                "LABVIEW_TIMESTAMPS_PATH"] = self.LABVIEW_TIMESTAMPS_PATH if self.LABVIEW_TIMESTAMPS_PATH is not None \
                 else ""
             basic_group["LFP_PATH"] = self.LFP_PATH if self.LFP_PATH is not None else ""
             basic_group["MATLAB_2P_FOLDER"] = self.MATLAB_2P_FOLDER if self.MATLAB_2P_FOLDER is not None else ""
