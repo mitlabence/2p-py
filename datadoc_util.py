@@ -238,7 +238,12 @@ class DataDocumentation:
                 "DataDocumentation object")
     def getNikonFileNameForUuid(self, uuid):
         if self.GROUPING_DF is not None:
-            return self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].nd2.values[0]
+            if isinstance(uuid, str):
+                return self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].nd2.values[0]
+            elif isinstance(uuid, list):
+                return self.GROUPING_DF[self.GROUPING_DF["uuid"].isin(uuid)].nd2.values
+            else:
+                raise Exception(f"uuid has type {type(uuid)}; needs to be str or list[str]!")
         else:
             raise Exception(
                 "datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate "
