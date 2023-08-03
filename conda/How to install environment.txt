@@ -1,6 +1,15 @@
+There are two ways (both untested at application level, only tested at installation level) to install the anaconda environment.
+1. In navigator: choose Import. Select env_2ppy_navigator.yaml. In a few minutes, it should arrive to the pip-installed packages and throw an error.
+	Ignore it. Once the environment is ready, proceed with installing packages manually, see below.
+2. In anaconda prompt: cd to 2p-py/conda folder. Type "conda create --name <environment name> --file env_2ppy_prompt.txt". Starting the environment name with a number is not advised. Proceed with installing the packages below manually.
+
+
 Tips for pycharm:
 create a conda environment using 2p-py-env.txt. It will install almost all packages except the list below.
 Set this to the project interpreter in PyCharm. It might still run the default anaconda interpreter, and throw errors while importing stuff. Set the correct interpeter in the project configurations!
+
+
+Manually installed packages:
 
 conda install statsmodels
 conda install multiprocess  # alternative to multiprocessing that works with IPython (Jupyter notebook, presumably also anaconda prompt). https://stackoverflow.com/questions/41385708/multiprocessing-example-giving-attributeerror
@@ -20,3 +29,23 @@ ffmpeg needs to be installed for exporting videos. (e. g. Play nd2 along LFP, mo
 	Even extracting there does not work easily). Then add the bin folder to the Path environmental variable (Edit the system environment variables). 
 	Need to restart the prompt (Anaconda prompt) afterwards! Run ffmpeg and see if it works. If yes, ffmpeg should be installed. 
 	Test the python library too (import ffmpeg) before using it.
+	
+	
+	
+The manually installed packages:
+  - matlabengineforpython==R2020b=pypi_0
+  - numba==0.56.4=pypi_0
+  - pyedflib==0.1.33=pypi_0
+  - numexpr==2.8.4=pypi_0
+  - cython==0.29.34=pypi_0
+  - pims-nd2==1.1=pypi_0
+  - pyabf==2.3.7=pypi_0
+  - h5py==3.8.0=pypi_0
+  - msgpack==1.0.5=pypi_0
+  - pytest==7.2.1=pypi_0
+  - iniconfig==2.0.0=pypi_0
+  - tables==3.8.0=pypi_0
+  - exceptiongroup==1.1.0=pypi_0
+  - blosc2==2.0.0=pypi_0
+  - py-cpuinfo==9.0.0=pypi_0
+  - llvmlite==0.39.1=pypi_0

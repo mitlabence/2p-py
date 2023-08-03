@@ -1,0 +1,18 @@
+Export in a cross-platform compatible way:
+conda env export --from-history>env.yml
+
+platform + package specific:
+conda env export ENVNAME>env.yml
+
+platform + package + channel specific:
+conda list --explicit>env.yml
+
+% UPDATE 2023.08.03:
+none of the above methods seem to work. conda env export seems to just export the folder of the environment.
+The conda list --explicit cannot be read by conda create.
+
+Two ways:
+1. Using Anaconda Navigator: backup the selected environment. 
+	Then use Navigator Import on the file to install the environment. Pip failed will appear for pip packages, install them manually later.
+2. conda list --name <env-name> --export > <export_fname>.txt
+	Then use conda create
