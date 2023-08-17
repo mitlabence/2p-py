@@ -408,29 +408,38 @@ class TwoPhotonSession:
         self.lfp_file.setSweep(sweepNumber=0, channel=0)
         return self.lfp_file.sweepX, self.lfp_file.sweepY
 
-    def lfp_movement(self):
+    def lfp_movement(self, as_numpy: bool = False):
         """
-        Returns columns of the lfp data internal dataframe as pandas Series: a tuple of (t_series, y_series) for lfp
+        Returns columns of the lfp data internal dataframe as pandas Series (or numpy array if as_numpy is True): a tuple of (t_series, y_series) for lfp
         channel 0 (lfp) data.
         :return: tuple of two pandas Series
         """
-        return self.lfp_df["t_mov_corrected"], self.lfp_df["y_mov"]
+        if as_numpy:
+            return self.lfp_df["t_mov_corrected"].to_numpy(), self.lfp_df["y_mov"].to_numpy()
+        else:
+            return self.lfp_df["t_mov_corrected"], self.lfp_df["y_mov"]
 
-    def lfp_lfp(self):
+    def lfp_lfp(self, as_numpy: bool = False):
         """
-        Returns columns of the lfp data internal dataframe as pandas Series: a tuple of (t_series, y_series) for lfp
+        Returns columns of the lfp data internal dataframe as pandas Series (or numpy array if as_numpy is True): a tuple of (t_series, y_series) for lfp
         channel 1 (movement) data.
         :return: tuple of two pandas Series
         """
-        return self.lfp_df["t_lfp_corrected"], self.lfp_df["y_lfp"]
+        if as_numpy:
+            return self.lfp_df["t_lfp_corrected"].to_numpy(), self.lfp_df["y_lfp"].to_numpy()
+        else:
+            return self.lfp_df["t_lfp_corrected"], self.lfp_df["y_lfp"]
 
-    def labview_movement(self):
+    def labview_movement(self, as_numpy: bool = False):
         """
-        Returns columns of the labview data internal dataframe as pandas Series: a tuple of (t_series, y_series)
+        Returns columns of the labview data internal dataframe as pandas Series (or numpy array if as_numpy is True): a tuple of (t_series, y_series)
         for labView time and speed data.
         :return: tuple of two pandas Series
         """
-        return self.belt_df.time_s, self.belt_df.speed
+        if as_numpy:
+            return self.belt_df.time_s.to_numpy(), self.belt_df.speed.to_numpy()
+        else:
+            return self.belt_df.time_s, self.belt_df.speed
 
     def _create_nikon_daq_time(self):
         if self.nikon_meta is None:
