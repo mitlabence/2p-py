@@ -24,6 +24,8 @@ LFP_SCALING_FACTOR = 1.0038
 # for further information. %f is 0-padded microseconds to 6 digits.
 DATETIME_FORMAT = "%Y.%m.%d-%H:%M:%S.%f_%z"
 
+# the column names of the labview xy.txt files
+LV_COLNAMES = ["rounds", "speed", "total_distance", "distance_per_round", "reflectivity", "unknown", "stripes_total", "stripes_per_round", "time_total_ms", "time_per_round", "stimuli1", "stimuli2", "stimuli3", "stimuli4", "stimuli5", "stimuli6", "stimuli7", "stimuli8", "stimuli9", "pupil_area"]
 
 # TODO: save to hd5 and open from hd5! Everything except the nikon movie could be saved (and the dataframes). Logic
 #       is that we would not need the files anymore, we could combine with caiman results. Or, if we want, we can open
@@ -177,7 +179,7 @@ class TwoPhotonSession:
                        labview_timestamps_path=labview_timestamps_path,
                        lfp_path=lfp_path,
                        matlab_2p_folder=matlab_2p_folder, uuid=uuid, **kwargs)
-        instance._open_data()
+        instance._load_preprocess_data()
         # convert matlab arrays into numpy arrays
         if instance.belt_dict is not None:
             for k, v in instance.belt_dict.items():
@@ -327,8 +329,35 @@ class TwoPhotonSession:
             except FileNotFoundError:
                 print(f"from_hdf5: abf file not found:\n\t{instance.LFP_PATH}. Skipping opening.")
         return instance
-
-    def _open_data(self):  # TODO: rename this, as this does not only open data, but also processes some data.
+    def load_raw_labview_data(self):
+        pass
+    def load_raw_data(self):
+        if self.ND2_PATH is not None:
+            self.nikon_movie = pims_nd2.ND2_Reader(self.ND2_PATH)
+            self.nikon_true_length = self._find_nd2_true_length()
+            # TODO: nikon_movie should be closed properly upon removing this class (or does the reference counter
+            #  take care of it?)
+        if self.ND2_TIMESTAMPS_PATH is not None:
+            try:
+                self.nikon_meta = self.drop_nan_cols(
+                    pd.read_csv(
+                        self.ND2_TIMESTAMPS_PATH, delimiter="\t", encoding="utf_16_le"))
+            except UnicodeDecodeError:
+                print(
+                    "_open_data(): Timestamp file seems to be unusual. Trying to correct it.")
+                # TODO: if _corrected.txt already exists, do not create it again.
+                output_file_path = os.path.splitext(self.ND2_TIMESTAMPS_PATH)[0] + "_corrected.txt"
+                ntsr.standardize_stamp_file(
+                    self.ND2_TIMESTAMPS_PATH, output_file_path, export_encoding="utf_16_le")
+                self.nikon_meta = self.drop_nan_cols(
+                    pd.read_csv(
+                        output_file_path, delimiter="\t", encoding="utf_16_le"))
+                self.ND2_TIMESTAMPS_PATH = output_file_path
+    def _load_preprocess_data(self):
+        """
+        Load the data: Nikon 2p recording, LabView (also preprocess it), and LFP.
+        :return:
+        """
         if self.ND2_PATH is not None:
             self.nikon_movie = pims_nd2.ND2_Reader(self.ND2_PATH)
             self.nikon_true_length = self._find_nd2_true_length()
