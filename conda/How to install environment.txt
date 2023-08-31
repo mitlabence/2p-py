@@ -5,7 +5,7 @@ There are two ways (both untested at application level, only tested at installat
 	add the conda-forge channel first: conda config --add channels conda-forge
 	cd to 2p-py/conda folder. Type "conda create --name <environment name> --file env_2ppy_prompt.txt". Starting the environment name with a number is not advised. Proceed with installing the packages below manually.
 In both cases, after successful creation of the environment, manually install the packages listed below.
-
+Also set up a .env file in the 2p-py folder (see sample .env) to be able to run most notebooks.
 
 Tips for pycharm:
 create a conda environment using 2p-py-env.txt. It will install almost all packages except the list below.
