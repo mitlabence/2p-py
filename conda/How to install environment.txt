@@ -1,7 +1,10 @@
 There are two ways (both untested at application level, only tested at installation level) to install the anaconda environment.
-1. In navigator: choose Import. Select env_2ppy_navigator.yaml. In a few minutes, it should arrive to the pip-installed packages and throw an error.
+1. In navigator: choose Import. (Note: one might need to add the conda-forge channel in this method, too.) Select env_2ppy_navigator.yaml. In a few minutes, it should arrive to the pip-installed packages and throw an error.
 	Ignore it. Once the environment is ready, proceed with installing packages manually, see below.
-2. In anaconda prompt: cd to 2p-py/conda folder. Type "conda create --name <environment name> --file env_2ppy_prompt.txt". Starting the environment name with a number is not advised. Proceed with installing the packages below manually.
+2. In anaconda prompt: 
+	add the conda-forge channel first: conda config --add channels conda-forge
+	cd to 2p-py/conda folder. Type "conda create --name <environment name> --file env_2ppy_prompt.txt". Starting the environment name with a number is not advised. Proceed with installing the packages below manually.
+In both cases, after successful creation of the environment, manually install the packages listed below.
 
 
 Tips for pycharm:
