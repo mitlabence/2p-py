@@ -69,7 +69,7 @@ class TwoPhotonSession:
             belt_scn_dict
             belt_df
             belt_scn_df
-            nikon_daq_time
+            nikon_daq_time: pandas.core.series.Series
             lfp_df
             lfp_df_cut
             time_offs_lfp_nik
@@ -271,14 +271,17 @@ class TwoPhotonSession:
             instance.belt_dict = dict()
             instance.belt_scn_dict = dict()
             instance.belt_params = dict()
-            if "inferred" in hfile.keys():
-                if "belt_dict" in hfile["inferred"].keys():  # assume here that all three are saved (or not) together
-                    for key, value in hfile["inferred"]["belt_dict"].items():
-                        instance.belt_dict[key] = value[()]
-                    for key, value in hfile["inferred"]["belt_scn_dict"].items():
-                        instance.belt_scn_dict[key] = value[()]
-                    for key, value in hfile["inferred"]["belt_params"].items():
-                        instance.belt_params[key] = value[()]
+            if "inferred" not in hfile.keys():
+                raise Exception("Error: key 'inferred' in hdf5 file not found.")
+            if "belt_dict" in hfile["inferred"].keys():  # assume here that all three are saved (or not) together
+                for key, value in hfile["inferred"]["belt_dict"].items():
+                    instance.belt_dict[key] = value[()]
+            if "belt_scn_dict" in hfile["inferred"].keys():
+                for key, value in hfile["inferred"]["belt_scn_dict"].items():
+                    instance.belt_scn_dict[key] = value[()]
+            if "belt_params" in hfile["inferred"].keys():
+                for key, value in hfile["inferred"]["belt_params"].items():
+                    instance.belt_params[key] = value[()]
             # create dict for dataframes
             if "nikon_meta" in hfile["inferred"].keys():
                 nikon_meta_dict = dict()
@@ -300,21 +303,22 @@ class TwoPhotonSession:
                 for key, value in hfile["inferred"]["lfp_df"].items():
                     lfp_df_dict[key] = value[()]
                 instance.lfp_df = pd.DataFrame.from_dict(lfp_df_dict)
+            if "lfp_df_cut" in hfile["inferred"].keys():
                 lfp_df_cut_dict = dict()
                 for key, value in hfile["inferred"]["lfp_df_cut"].items():
                     lfp_df_cut_dict[key] = value[()]
                 instance.lfp_df_cut = pd.DataFrame.from_dict(lfp_df_cut_dict)
-            if "lfp_df" in hfile["nikon_daq_time"].keys():
-                instance.nikon_daq_time = pd.Series(hfile["inferred"]["nikon_daq_time"][()])
-            if "time_offs_lfp_nik" in hfile["nikon_daq_time"].keys():
+            if "time_offs_lfp_nik" in hfile["inferred"].keys():
                 instance.time_offs_lfp_nik = hfile["inferred"]["time_offs_lfp_nik"][()]
-            if "time_offs_lfp_nik" in hfile["lfp_t_start"].keys():
-                instance.lfp_t_start = datetime.datetime.strptime(hfile["inferred"]["lfp_t_start"][()], DATETIME_FORMAT)
-            if "time_offs_lfp_nik" in hfile["nik_t_start"].keys():
-                instance.nik_t_start = datetime.datetime.strptime(hfile["inferred"]["nik_t_start"][()], DATETIME_FORMAT)
-            if "time_offs_lfp_nik" in hfile["lfp_scaling"].keys():
+            if "nik_t_start" in hfile["inferred"].keys():
+                instance.nik_t_start = datetime.datetime.strptime(hfile["inferred"]["nik_t_start"][()].decode(), DATETIME_FORMAT)
+            if "lfp_t_start" in hfile["inferred"].keys():
+                instance.lfp_t_start = datetime.datetime.strptime(hfile["inferred"]["lfp_t_start"][()].decode(), DATETIME_FORMAT)
+            if "lfp_scaling" in hfile["inferred"].keys():
                 instance.lfp_scaling = hfile["inferred"]["lfp_scaling"][()]
-            if "mean_fluo" in hf.keys():
+            if "nikon_daq_time" in hfile["inferred"].keys():
+                instance.nikon_daq_time = pd.Series(hfile["inferred"]["nikon_daq_time"][()])
+            if "mean_fluo" in hfile.keys():
                 instance.mean_fluo = hfile["mean_fluo"][()]
                 instance.nikon_true_length = len(instance.mean_fluo)
 
@@ -427,6 +431,7 @@ class TwoPhotonSession:
         else:
             event_times = self.nikon_meta[self.nikon_meta["Index"].isna() == True]
             # drop non-imaging frames from metadata
+            # TODO: handle properly stim frames! (add new class field - extra frames? or stim frames?)
             self.nikon_meta.dropna(subset=["Index"], inplace=True)
 
     def _lfp_movement_raw(self):
@@ -828,13 +833,18 @@ class TwoPhotonSession:
                     [lfp_df_cut] - DataFrame
                     [belt_df] - DataFrame
                     [belt_scn_df] - DataFrame
+                    [nikon_meta] - DataFrame
             Not saved:
-                (nikon_meta) - DataFrame
                 (lfp_file) - ABFReader
                 (nikon_movie) - ND2Reader
 
         :param kwargs:
-        safe_full: bool - flag whether to save redundant dataframes (i.e. the full object, except the data sources).
+        fpath: str - the currently not existing file (including folder and file name) to be created and saved to.
+            Should have ".h5" extension. For example: "C:\\Downloads\\session_v1.h5"
+        save_full: bool - flag whether to save redundant dataframes (i.e. the full object, except the data sources).
+            Note: if the result is to be used on a computer where the original  files are not accessible, it makes sense
+            to set this flag to True. In this case, not only mean Nikon fluorescence and matched and raw labview data,
+            but also matched LFP data will be saved in the file.
         :return: fpath: the exported file path as string.
         """
         # set export file name and path
@@ -842,7 +852,11 @@ class TwoPhotonSession:
             fpath = kwargs.get("fpath", os.path.splitext(self.ND2_PATH)[0] + ".h5")
         with h5py.File(fpath, "w") as hfile:
             hfile.attrs["creation_time"] = str(datetime.datetime.now())
-            hfile.attrs["uuid"] = self.uuid
+            if self.uuid is not None:
+                hfile.attrs["uuid"] = self.uuid
+            else:
+                warnings.warn("No uuid given! Consider assigning one and exporting again.")
+                hfile.attrs["uuid"] = "NaN"
 
             if self.nikon_movie is not None:
                 hfile.attrs["nikon_true_length"] = self.nikon_true_length
@@ -895,6 +909,7 @@ class TwoPhotonSession:
             inferred_group["nik_t_start"] = self.nik_t_start.strftime(
                 DATETIME_FORMAT) if self.nik_t_start is not None else ""
             inferred_group["lfp_scaling"] = self.lfp_scaling if self.lfp_scaling is not None else np.nan
+
             # save lfp_df
             if self.lfp_df is not None and save_full:
                 lfp_df_group = inferred_group.create_group("lfp_df")
@@ -915,6 +930,15 @@ class TwoPhotonSession:
                 belt_scn_df_group = inferred_group.create_group("belt_scn_df")
                 for col_name in self.belt_scn_df.keys():
                     belt_scn_df_group[col_name] = self.belt_scn_df[col_name].to_numpy()
+
+            if self.nikon_meta is not None and save_full:
+                nikon_meta_group = inferred_group.create_group("nikon_meta")
+                for col_name in self.nikon_meta.keys():
+                    if self.nikon_meta[col_name].dtype == np.dtype('O'):
+                        print(f"nikon_meta['{col_name}'] entries have type 'np.dtype('O')'. Converting...")
+                        nikon_meta_group[col_name] = self.nikon_meta[col_name].to_numpy(dtype = np.float64)
+                    else:
+                        nikon_meta_group[col_name] = self.nikon_meta[col_name].to_numpy()
         return fpath
 
     # TODO: get nikon frame matching time stamps (NIDAQ time)! It is session.nikon_daq_time
