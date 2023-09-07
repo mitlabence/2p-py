@@ -62,5 +62,10 @@ def get_filename_with_date(raw_filename: str = "output_file", extension: str = "
     """
     # todo: this should be a bit more sophisticated. (dealing with cases like extension without "." etc.), getting rid
     #  of extension in raw_filename if supplied...
-    datetime_suffix = dt.datetime.now().strftime("%y-%m-%d_%H-%M-%S")
+    datetime_suffix = get_datetime_for_fname()  # dt.datetime.now().strftime("%y-%m-%d_%H-%M-%S")
     return raw_filename + "_" + datetime_suffix + extension
+
+
+def get_datetime_for_fname():
+    now = dt.datetime.now()
+    return f"{now.year:04d}{now.month:02d}{now.day:02d}-{now.hour:02d}{now.minute:02d}{now.second:02d}"
