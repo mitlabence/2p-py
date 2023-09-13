@@ -335,6 +335,45 @@ class TwoPhotonSession:
         return instance
     def load_raw_labview_data(self):
         pass
+    def _load_nikon_meta(self):
+        try:
+            self.nikon_meta = self.drop_nan_cols(
+                pd.read_csv(
+                    self.ND2_TIMESTAMPS_PATH, delimiter="\t", encoding="utf_16_le"))
+        except UnicodeDecodeError:
+            print(
+                "_open_data(): Timestamp file seems to be unusual. Trying to correct it.")
+            output_file_path = os.path.splitext(self.ND2_TIMESTAMPS_PATH)[0] + "_corrected.txt"
+            ntsr.standardize_stamp_file(
+                self.ND2_TIMESTAMPS_PATH, output_file_path, export_encoding="utf_16_le")
+            self.nikon_meta = self.drop_nan_cols(
+                pd.read_csv(
+                    output_file_path, delimiter="\t", encoding="utf_16_le"))
+            self.ND2_TIMESTAMPS_PATH = output_file_path
+        # correct various formatting that might occur in the file
+        if "Time [m:s.ms]" in self.nikon_meta.columns:
+            # Example entries:
+            # "0:00.2480" -> 0*60 +  0.2480
+            # "3:53.1423" -> 3*60 + 53.1423
+            # "2:03.9290" -> 2*60 +  3.9290
+
+            # split by the ":" separator; convert both sides to float, multiply first element by 60, second by 1; then create sum
+            print("Correcting 'Time [m:s.ms]' column...")
+            self.nikon_meta["Time [m:s.ms]"] = self.nikon_meta.apply(lambda row: sum(np.array(list(map(float, row["Time [m:s.ms]"].split(":"))))*np.array([60,1])), axis=1)
+            print("Corrected.")
+        if "SW Time [s]" in self.nikon_meta.columns and self.nikon_meta["SW Time [s]"].dtype is np.dtype('O'):
+            # in this case, comma is used as separator instead of decimal point.
+            print("Correcting SW Time [s] comma decimal separator...")
+            self.nikon_meta["SW Time [s]"] = self.nikon_meta.apply(lambda row: float(row["SW Time [s]"].replace(",", ".")), axis=1)
+            print("Corrected.")
+        if "NIDAQ Time [s]" in self.nikon_meta.columns and self.nikon_meta["NIDAQ Time [s]"].dtype is np.dtype('O'):
+            # Same as for SW Time [s]: comma is used as separator instead of decimal point.
+            print("Correcting NIDAQ Time [s] comma decimal separator...")
+            self.nikon_meta["NIDAQ Time [s]"] = self.nikon_meta.apply(
+                lambda row: float(row["NIDAQ Time [s]"].replace(",", ".")), axis=1)
+            print("Corrected.")
+        
+
     def load_raw_data(self):
         if self.ND2_PATH is not None:
             self.nikon_movie = pims_nd2.ND2_Reader(self.ND2_PATH)
@@ -342,21 +381,7 @@ class TwoPhotonSession:
             # TODO: nikon_movie should be closed properly upon removing this class (or does the reference counter
             #  take care of it?)
         if self.ND2_TIMESTAMPS_PATH is not None:
-            try:
-                self.nikon_meta = self.drop_nan_cols(
-                    pd.read_csv(
-                        self.ND2_TIMESTAMPS_PATH, delimiter="\t", encoding="utf_16_le"))
-            except UnicodeDecodeError:
-                print(
-                    "_open_data(): Timestamp file seems to be unusual. Trying to correct it.")
-                # TODO: if _corrected.txt already exists, do not create it again.
-                output_file_path = os.path.splitext(self.ND2_TIMESTAMPS_PATH)[0] + "_corrected.txt"
-                ntsr.standardize_stamp_file(
-                    self.ND2_TIMESTAMPS_PATH, output_file_path, export_encoding="utf_16_le")
-                self.nikon_meta = self.drop_nan_cols(
-                    pd.read_csv(
-                        output_file_path, delimiter="\t", encoding="utf_16_le"))
-                self.ND2_TIMESTAMPS_PATH = output_file_path
+            self._load_nikon_meta()
     def _load_preprocess_data(self):
         """
         Load the data: Nikon 2p recording, LabView (also preprocess it), and LFP.
@@ -368,20 +393,7 @@ class TwoPhotonSession:
             # TODO: nikon_movie should be closed properly upon removing this class (or does the reference counter
             #  take care of it?)
         if self.ND2_TIMESTAMPS_PATH is not None:
-            try:
-                self.nikon_meta = self.drop_nan_cols(
-                    pd.read_csv(
-                        self.ND2_TIMESTAMPS_PATH, delimiter="\t", encoding="utf_16_le"))
-            except UnicodeDecodeError:
-                print(
-                    "_open_data(): Timestamp file seems to be unusual. Trying to correct it.")
-                output_file_path = os.path.splitext(self.ND2_TIMESTAMPS_PATH)[0] + "_corrected.txt"
-                ntsr.standardize_stamp_file(
-                    self.ND2_TIMESTAMPS_PATH, output_file_path, export_encoding="utf_16_le")
-                self.nikon_meta = self.drop_nan_cols(
-                    pd.read_csv(
-                        output_file_path, delimiter="\t", encoding="utf_16_le"))
-                self.ND2_TIMESTAMPS_PATH = output_file_path
+            self._load_nikon_meta()
         if hasattr(self, "LABVIEW_PATH") and self.LABVIEW_PATH is not None and \
                 hasattr(self, "ND2_TIMESTAMPS_PATH") and self.ND2_TIMESTAMPS_PATH is not None:
             self.belt_dict, self.belt_scn_dict, self.belt_params = belt_processing.beltProcessPipelineExpProps(
