@@ -19,6 +19,7 @@ class DataDocumentation:
     GROUPING_DF = None  # df containing files belonging together in a session
     SEGMENTATION_DF = None  # df containing segmentation
     WIN_INJ_TYPES_DF = None  # df containing window side, type, injection side, type.
+    EVENTS_DF = None  # df containing all events and the corresponding metadata
     SEGMENTS_CNMF_CATS = {"normal": True, "iis": False, "sz": False, "sz_like": False, "sd_wave": False,
                           "sd_extinction": False,
                           "fake_handling": False, "sd_wave_delayed": False, "sd_extinction_delayed": False,
@@ -89,6 +90,8 @@ class DataDocumentation:
                             self.SEGMENTATION_DF = pd.concat([self.SEGMENTATION_DF, df])
                 elif name == "window_injection_types_sides.xlsx":
                     self.WIN_INJ_TYPES_DF = pd.read_excel(os.path.join(root, name))
+                elif name == "events_list.xlsx":
+                    self.EVENTS_DF = pd.read_excel(os.path.join(root, name))
         if self.WIN_INJ_TYPES_DF is None:
             raise Exception(f"Error: window_injection_types_sides.xlsx was not found in data documentation! \
             Possible reason is the changed structure of data documentation. This file was moved out of 'documentation'. Do not move it back!")
@@ -255,3 +258,16 @@ class DataDocumentation:
             raise Exception(
                 "datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate "
                 "DataDocumentation object")
+
+    def getSegmentForFrame(self, uuid, frame):
+        """
+        Given a 1-indexed frame, return a row containing interval type, beginning frame, end frame for the segment that the frame belongs to.
+        :param uuid: The uuid of the recording.
+        :param frame: The 1-indexed frame (i.e. first frame = 1) to get the segment info on.
+        :return: a pandas DataFrame with columns "nd2", "interval_type", "frame_begin", "frame_end", and with at most one row, the segment that the frame belongs to.
+        """
+        nd2_file = self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].nd2.values[0]
+        return self.SEGMENTATION_DF[(self.SEGMENTATION_DF["nd2"] == nd2_file) & (self.SEGMENTATION_DF["frame_begin"] <= frame) & (self.SEGMENTATION_DF["frame_end"] >= frame)]
+
+    def getEventsDf(self):
+        return self.EVENTS_DF
