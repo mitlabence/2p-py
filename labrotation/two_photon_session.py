@@ -254,7 +254,8 @@ class TwoPhotonSession:
         # TODO: make it work with new structure of export_hdf5, incl. omitting dataframes for saving (these should be
         #  easy to recreate) if the proper flag was not set.
         # TODO: handle exceptions (missing data)
-
+        # TODO: strings are saved as bytes. Leads to issues when opening files (already checking for this and use decode() in some cases, need to extend this!)
+        # TODO: session.nikon_meta is not loaded
         with h5py.File(fpath, "r") as hfile:
             basic_attributes = dict()
             for key, value in hfile["basic"].items():
@@ -321,21 +322,30 @@ class TwoPhotonSession:
             if "mean_fluo" in hfile.keys():
                 instance.mean_fluo = hfile["mean_fluo"][()]
                 instance.nikon_true_length = len(instance.mean_fluo)
+            if instance.ND2_TIMESTAMPS_PATH is not None:
+                if type(instance.ND2_TIMESTAMPS_PATH) == bytes:
+                    instance.ND2_TIMESTAMPS_PATH = instance.ND2_TIMESTAMPS_PATH.decode()
+                instance._load_nikon_meta()
 
         if try_open_files:  # TODO: could be perfect duplicate of _open_data(). At least part of the code is duplicate
-            try:
-                instance.nikon_movie = pims_nd2.ND2_Reader(instance.ND2_PATH)
-                instance.nikon_true_length = self._find_nd2_true_length()
-            except FileNotFoundError:
+            if os.path.exists(instance.ND2_PATH):
+                if type(instance.ND2_PATH) == bytes:
+                    instance.ND2_PATH = instance.ND2_PATH.decode()
+                instance.nikon_movie = pims_nd2.ND2_Reader(str(instance.ND2_PATH))
+                instance.nikon_true_length = instance._find_nd2_true_length()
+            else:
                 print(f"from_hdf5: nd2 file not found:\n\t{instance.ND2_PATH}. Skipping opening.")
-            try:
+            if os.path.exists(instance.LFP_PATH):
+                if type(instance.LFP_PATH) == bytes:
+                    instance.LFP_PATH = instance.LFP_PATH.decode()
                 instance.lfp_file = abf.ABF(instance.LFP_PATH)
-            except FileNotFoundError:
+            else:
                 print(f"from_hdf5: abf file not found:\n\t{instance.LFP_PATH}. Skipping opening.")
         return instance
     def load_raw_labview_data(self):
         pass
     def _load_nikon_meta(self):
+        # TODO: drop the frames where "Stimulation" is in Events Type column! (happens for jedi (high frequency) recordings)
         try:
             self.nikon_meta = self.drop_nan_cols(
                 pd.read_csv(
