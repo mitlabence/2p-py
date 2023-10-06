@@ -103,6 +103,17 @@ class DataDocumentation:
             raise Exception(
                 "datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate DataDocumentation object")
 
+    def getColorings(self):
+        """
+        Read out the 'color coding.xlsx' of the data documentation, which should contain ID - color hex, r, g, b pairs.
+        :return: pandas dataframe
+        """
+        color_coding_fpath = os.path.join(self.DATADOC_FOLDER, "color coding.xlsx")
+        if os.path.exists(color_coding_fpath):
+            return pd.read_excel(color_coding_fpath)
+        else:
+            raise Exception(f"File {color_coding_fpath} does not exist.")
+
     def getUUIDForFileDeprecated(self, nd2_fname, data_docu_folder):
         if os.path.splitext(nd2_fname)[-1] == ".nd2":
             docu_files_list = []
