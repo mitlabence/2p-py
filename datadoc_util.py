@@ -280,5 +280,17 @@ class DataDocumentation:
         nd2_file = self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].nd2.values[0]
         return self.SEGMENTATION_DF[(self.SEGMENTATION_DF["nd2"] == nd2_file) & (self.SEGMENTATION_DF["frame_begin"] <= frame) & (self.SEGMENTATION_DF["frame_end"] >= frame)]
 
+    def getRecordingsWithExperimentType(self, experiment_types="fov_dual"):
+        """
+        Return all grouping info of recordings with the defined experiment_type,
+        :param experiment_types: string or list of strings, type(s) of experiment. Some examples: fov_dual, tmev, tmev_bl, chr2_szsd,
+        chr2_ctl, chr2_sd
+        :return:
+        """
+        if type(experiment_types) is str:
+            return self.GROUPING_DF[self.GROUPING_DF.experiment_type == experiment_types]
+        elif type(experiment_types) is list:
+            assert type(experiment_types[0]) == str
+            return self.GROUPING_DF[self.GROUPING_DF.experiment_type.isin(experiment_types)]
     def getEventsDf(self):
         return self.EVENTS_DF
