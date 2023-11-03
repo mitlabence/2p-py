@@ -2,11 +2,17 @@ Make sure to install pip packages:
 pip install pims_nd2
 pip install pyabf
 
+----------------------------------
+
 OpenCV (ImportError: DLL load failed: The specified module could not be found.):
 pip install opencv-contrib-python (see https://stackoverflow.com/questions/43184887/dll-load-failed-error-when-importing-cv2)
 
+----------------------------------
+
 Make sure to install matlab engine:
 see Test Matlab Integration notebook
+
+----------------------------------
 
 error upon trying "import pims_nd2" or "import pims":
 OSError: [WinError 14001] The application has failed to start because its side-by-side configuration is incorrect. Please see the application event log or use the command-line sxstrace.exe tool for more detail
@@ -31,3 +37,22 @@ Here one must confirm that indeed pims_nd2 has a problem (it is obvious from the
 Next, Microsoft.VC90 refers to VC++. Then, the version is important: here, 9.0.21022.8 refers to version 9. This is an old version (no longer supported),
 but one can still download (2023 September) the x86 and x64 versions (both needed) from here: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#visual-studio-2015-2017-2019-and-2022
 As of now, the downloadable version is 9.0.30729.5677. It should work nevertheless.
+
+----------------------------------
+
+from labrotation import two_photon_session as tps results in dead kernel:
+Check in the anaconda prompt where jupyter-notebook is running. It should say something like this:
+"Warning! ***HDF5 library version mismatched error***
+The HDF5 header files used to compile this application do not match
+the version used by the HDF5 library to which this application is linked.
+Data corruption or segmentation faults may occur if the application continues.
+This can happen when an application was compiled by one version of HDF5 but
+linked with a different version of static or shared HDF5 library.
+You should recompile the application or check your shared library related
+settings such as 'LD_LIBRARY_PATH'.
+You can, at your own risk, disable this warning by setting the environment
+variable 'HDF5_DISABLE_VERSION_CHECK' to a value of '1'.
+Setting it to 2 or higher will suppress the warning messages totally.
+[I 13:39:58.850 NotebookApp] Saving file at /Extract 15 min stimulation recordings.ipynb
+Headers are 1.10.6, library is 1.10.8" (with much more details following)
+
