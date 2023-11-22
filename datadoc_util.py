@@ -294,3 +294,6 @@ class DataDocumentation:
             return self.GROUPING_DF[self.GROUPING_DF.experiment_type.isin(experiment_types)]
     def getEventsDf(self):
         return self.EVENTS_DF
+
+    def getExperimentTypeForUuid(self, uuid):
+        return self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].experiment_type.iloc[0]
