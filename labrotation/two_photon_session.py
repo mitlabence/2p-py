@@ -25,7 +25,10 @@ LFP_SCALING_FACTOR = 1.0038
 DATETIME_FORMAT = "%Y.%m.%d-%H:%M:%S.%f_%z"
 
 # the column names of the labview xy.txt files
-LV_COLNAMES = ["rounds", "speed", "total_distance", "distance_per_round", "reflectivity", "unknown", "stripes_total", "stripes_per_round", "time_total_ms", "time_per_round", "stimuli1", "stimuli2", "stimuli3", "stimuli4", "stimuli5", "stimuli6", "stimuli7", "stimuli8", "stimuli9", "pupil_area"]
+LV_COLNAMES = ["rounds", "speed", "total_distance", "distance_per_round", "reflectivity", "unknown", "stripes_total",
+               "stripes_per_round", "time_total_ms", "time_per_round", "stimuli1", "stimuli2", "stimuli3", "stimuli4",
+               "stimuli5", "stimuli6", "stimuli7", "stimuli8", "stimuli9", "pupil_area"]
+
 
 # TODO: save to hd5 and open from hd5! Everything except the nikon movie could be saved (and the dataframes). Logic
 #       is that we would not need the files anymore, we could combine with caiman results. Or, if we want, we can open
@@ -78,6 +81,8 @@ class TwoPhotonSession:
             nik_t_start: datetime.datetime
             lfp_scaling: float = LFP_SCALING_FACTOR defined in __init__
             mean_fluo: np.array(np.float64?) mean fluorescence [optional]
+            df_stim: pd.DataFrame the precise readout of the Nikon stimulation time stamps from the metadata file
+                    (i.e. the two rows stimulation begin and stimulation end)
     """
 
     # IMPORTANT: change the used lfp_scaling to always be the actual scaling used! Important for exporting (saving)
@@ -130,6 +135,8 @@ class TwoPhotonSession:
         self.mean_fluo = None
         self.nikon_true_length = None
         self.verbose = True  # printing some extra text by default
+        self.df_stim = None
+        self.corrupted_stim_data = False  # in many stimulation recordings, the stimulation stamps in _nik file are off
 
         # check for optionally supported keyword arguments:
         self._assign_from_kwargs("nikon_movie", kwargs)
@@ -148,7 +155,7 @@ class TwoPhotonSession:
         self._assign_from_kwargs("nik_t_start", kwargs)
         self._assign_from_kwargs("lfp_scaling", kwargs)
         self._assign_from_kwargs("nikon_true_length", kwargs)
-        self._assign_from_kwargs("verbose", kwargs)
+        self._assign_from_kwargs("df_stim", kwargs)
 
     def _assign_from_kwargs(self, attribute_name: str, kwargs_dict: dict):
         if attribute_name in kwargs_dict.keys():
@@ -185,7 +192,7 @@ class TwoPhotonSession:
             for k, v in instance.belt_dict.items():
                 instance.belt_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_dict[k])
             instance.belt_dict["dt"] = instance._lv_dt(instance.belt_dict["time"])
-            #instance.belt_dict["dt_tsscn"] = instance._lv_dt(instance.belt_dict["tsscn"])
+            # instance.belt_dict["dt_tsscn"] = instance._lv_dt(instance.belt_dict["tsscn"])
             instance.belt_dict["totdist_abs"] = instance._lv_totdist_abs(instance.belt_dict["speed"],
                                                                          instance.belt_dict["dt"])
         if instance.belt_scn_dict is not None:
@@ -312,9 +319,11 @@ class TwoPhotonSession:
             if "time_offs_lfp_nik" in hfile["inferred"].keys():
                 instance.time_offs_lfp_nik = hfile["inferred"]["time_offs_lfp_nik"][()]
             if "nik_t_start" in hfile["inferred"].keys():
-                instance.nik_t_start = datetime.datetime.strptime(hfile["inferred"]["nik_t_start"][()].decode(), DATETIME_FORMAT)
+                instance.nik_t_start = datetime.datetime.strptime(hfile["inferred"]["nik_t_start"][()].decode(),
+                                                                  DATETIME_FORMAT)
             if "lfp_t_start" in hfile["inferred"].keys():
-                instance.lfp_t_start = datetime.datetime.strptime(hfile["inferred"]["lfp_t_start"][()].decode(), DATETIME_FORMAT)
+                instance.lfp_t_start = datetime.datetime.strptime(hfile["inferred"]["lfp_t_start"][()].decode(),
+                                                                  DATETIME_FORMAT)
             if "lfp_scaling" in hfile["inferred"].keys():
                 instance.lfp_scaling = hfile["inferred"]["lfp_scaling"][()]
             if "nikon_daq_time" in hfile["inferred"].keys():
@@ -342,8 +351,10 @@ class TwoPhotonSession:
             else:
                 print(f"from_hdf5: abf file not found:\n\t{instance.LFP_PATH}. Skipping opening.")
         return instance
+
     def load_raw_labview_data(self):
         pass
+
     def _load_nikon_meta(self):
         # TODO: drop the frames where "Stimulation" is in Events Type column! (happens for jedi (high frequency) recordings)
         try:
@@ -369,12 +380,15 @@ class TwoPhotonSession:
 
             # split by the ":" separator; convert both sides to float, multiply first element by 60, second by 1; then create sum
             print("Correcting 'Time [m:s.ms]' column...")
-            self.nikon_meta["Time [m:s.ms]"] = self.nikon_meta.apply(lambda row: sum(np.array(list(map(float, row["Time [m:s.ms]"].split(":"))))*np.array([60,1])), axis=1)
+            self.nikon_meta["Time [m:s.ms]"] = self.nikon_meta.apply(
+                lambda row: sum(np.array(list(map(float, row["Time [m:s.ms]"].split(":")))) * np.array([60, 1])),
+                axis=1)
             print("Corrected.")
         if "SW Time [s]" in self.nikon_meta.columns and self.nikon_meta["SW Time [s]"].dtype is np.dtype('O'):
             # in this case, comma is used as separator instead of decimal point.
             print("Correcting SW Time [s] comma decimal separator...")
-            self.nikon_meta["SW Time [s]"] = self.nikon_meta.apply(lambda row: float(row["SW Time [s]"].replace(",", ".")), axis=1)
+            self.nikon_meta["SW Time [s]"] = self.nikon_meta.apply(
+                lambda row: float(row["SW Time [s]"].replace(",", ".")), axis=1)
             print("Corrected.")
         if "NIDAQ Time [s]" in self.nikon_meta.columns and self.nikon_meta["NIDAQ Time [s]"].dtype is np.dtype('O'):
             # Same as for SW Time [s]: comma is used as separator instead of decimal point.
@@ -382,7 +396,6 @@ class TwoPhotonSession:
             self.nikon_meta["NIDAQ Time [s]"] = self.nikon_meta.apply(
                 lambda row: float(row["NIDAQ Time [s]"].replace(",", ".")), axis=1)
             print("Corrected.")
-        
 
     def load_raw_data(self):
         if self.ND2_PATH is not None:
@@ -392,6 +405,7 @@ class TwoPhotonSession:
             #  take care of it?)
         if self.ND2_TIMESTAMPS_PATH is not None:
             self._load_nikon_meta()
+
     def _load_preprocess_data(self):
         """
         Load the data: Nikon 2p recording, LabView (also preprocess it), and LFP.
@@ -412,12 +426,13 @@ class TwoPhotonSession:
             for key in self.belt_dict.keys():
                 try:
                     self.belt_dict[key] = self._matlab_array_to_numpy_array(self.belt_dict[key])
-                except Error:
+                except Exception as e:
                     print("Warning: belt_dict could not be mapped from matlab to python datatype!")
+                    raise e
             for key in self.belt_scn_dict.keys():
                 try:
                     self.belt_scn_dict[key] = self._matlab_array_to_numpy_array(self.belt_scn_dict[key])
-                except Error:
+                except Exception as e:
                     print("Warning: belt_scn_dict could not be mapped from matlab to python datatype!")
             # convert matlab.double() array to numpy array
             try:
@@ -433,6 +448,22 @@ class TwoPhotonSession:
             self.lfp_file = abf.ABF(self.LFP_PATH)
             self.lfp_scaling = LFP_SCALING_FACTOR
 
+    def _drop_useless_dimensions(self, array):
+        """
+        This function solves the problem that seems to stem from different Matlab versions used in belt processing.
+        Depending on matlab version, the returned 1d array might turn into 2d: the shape of the array (x,) becomes (1,x). In terms of array elements,
+        [x0, x1, ...] becomes [[x0, x1, ...]].
+        This function detects if such a bad formatting occurred and attempts to correct it
+        :param array: input array of matlab origin
+        :return: the same data but with redundant dimension removed.
+        """
+        if len(array.shape) == 1:
+            return array
+        elif len(array.shape) == 2 and array.shape[0] == 1:
+            print(
+                f"Matlab possibly messed up an array, shape {array.shape} detected; should probably be ({array.shape[1]},). attempting to remove the redundant dimension...")
+            return array[0]
+
     def drop_nan_cols(self, dataframe: pd.DataFrame):
         to_drop = []
         for column in dataframe.columns:
@@ -442,18 +473,21 @@ class TwoPhotonSession:
 
     def _matlab_array_to_numpy_array(self, matlab_array):
         if type(matlab_array) is np.ndarray:
-            return matlab_array
+            return self._drop_useless_dimensions(matlab_array)
         else:
-            return np.array(matlab_array._data)
+            return self._drop_useless_dimensions(np.array(matlab_array._data))
 
     def _nikon_remove_na(self):
         # get the stimulation metadata frames
         if self.nikon_meta is None:
             warnings.warn("_nikon_remove_na(): nikon metadata not available.")
         else:
-            event_times = self.nikon_meta[self.nikon_meta["Index"].isna() == True]
+            df_stim = self.nikon_meta[self.nikon_meta["Index"].isna() == True]
+            self.df_stim = df_stim  # FIXME low priority -  Turns out there are so many issues with the recorded time
+            # stamps (often false entries) that it's not worth it now to use them.
+            # Use data documentation stimulation frames instead.
+
             # drop non-imaging frames from metadata
-            # TODO: handle properly stim frames! (add new class field - extra frames? or stim frames?)
             self.nikon_meta.dropna(subset=["Index"], inplace=True)
 
     def _lfp_movement_raw(self):
@@ -520,17 +554,18 @@ class TwoPhotonSession:
         """
         assert len(speed) == len(dt)
         totdist_abs = np.zeros(len(speed))
-        totdist_abs[0] = speed[0]*dt[0]
+        totdist_abs[0] = speed[0] * dt[0]
         for i in range(1, len(totdist_abs)):
             totdist_abs[i] = totdist_abs[i - 1] + abs(speed[i] * dt[i])
         return totdist_abs
 
-    def _lv_dt(self, t)  -> np.array:
+    def _lv_dt(self, t) -> np.array:
         """
         Create new array with entry i = t[i] - t[i-1], with dt[0] = 0
         :param t: a time series. 1d numpy array
         :return: numpy array with dt entries, same length as t
         """
+        print(f"Shape of t in _lv_dt is {t.shape}")
         t1 = t[1:]
         t0 = t[:-1]
         dt = np.zeros(len(t))
@@ -616,7 +651,7 @@ class TwoPhotonSession:
             time_offs_lfp_nik = time_offset_sec + (sign * time_offs_lfp_nik.microseconds * 1e-6)
 
             # stop process if too much time detected between starting LFP and Nikon recording.
-            if time_offs_lfp_nik > 30.0:
+            if abs(time_offs_lfp_nik) > 30.0:
                 warnings.warn(
                     f"Warning! more than 30 s difference detected between starting the LFP and the Nikon "
                     f"recording!\nPossible cause: bug in conversion to utc (daylight saving mode, "
@@ -958,7 +993,7 @@ class TwoPhotonSession:
                 for col_name in self.nikon_meta.keys():
                     if self.nikon_meta[col_name].dtype == np.dtype('O'):
                         print(f"nikon_meta['{col_name}'] entries have type 'np.dtype('O')'. Converting...")
-                        nikon_meta_group[col_name] = self.nikon_meta[col_name].to_numpy(dtype = np.float64)
+                        nikon_meta_group[col_name] = self.nikon_meta[col_name].to_numpy(dtype=np.float64)
                     else:
                         nikon_meta_group[col_name] = self.nikon_meta[col_name].to_numpy()
         return fpath
@@ -1604,7 +1639,7 @@ def nb_view_patches_manual_control_NOTWORKING(Yr, A, C, b, f, d1, d2,
     on_transfer_pressed = CustomJS(
         args={
             'transfer_button': transfer_button, 'curr_cat': categories_new, 'btn_curr_cat': current_status,
-            'slider'         : slider
+            'slider': slider
         }, code="""
     var i_cell = slider.value - 1
     var cats_new = curr_cat.data['cats'];
@@ -1880,7 +1915,7 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
     on_transfer_pressed = CustomJS(
         args={
             'curr_cat': categories_new, 'btn_curr_cat': btn_current_status,
-            'slider'  : slider
+            'slider': slider
         }, code="""
            var i_cell = slider.value - 1
            var cats_new = curr_cat.data['cats'];
@@ -1900,7 +1935,7 @@ def nb_view_patches_manual_control(Yr, A, C, b, f, d1, d2,
 
     save_data_callback = CustomJS(
         args={
-            'new_cats'         : categories_new, 'index_map': index_map, 'out_fname': out_fname,
+            'new_cats': categories_new, 'index_map': index_map, 'out_fname': out_fname,
             'category_original': category_original
         },
         code=
