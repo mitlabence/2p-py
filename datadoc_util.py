@@ -60,6 +60,45 @@ class DataDocumentation:
                 elif "segmentation" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
                         print(os.path.join(root, name))
+    def checkFileConsistency(self, ):
+        """
+        Go over the sessions contained in the data documentation; print the files that were not found.
+        :return:
+        """
+        count_not_found = 0
+        for i_row, grouping_row in self.GROUPING_DF.iterrows():
+            folder = grouping_row["folder"]
+            nd2_fname = grouping_row["nd2"]
+            lv_fname = grouping_row["labview"]
+            lfp_fname = grouping_row["lfp"]
+            facecam_fname = grouping_row["face_cam_last"]
+            nikonmeta_fname = grouping_row["nikon_meta"]
+            if isinstance(nd2_fname, str):
+                fpath_complete = os.path.join(folder, nd2_fname)
+                if not os.path.exists(fpath_complete):
+                    print(f"Could not find {fpath_complete}")
+                    count_not_found += 1
+            if isinstance(lv_fname, str):
+                fpath_complete = os.path.join(folder, lv_fname)
+                if not os.path.exists(fpath_complete):
+                    print(f"Could not find {fpath_complete}")
+                    count_not_found += 1
+            if isinstance(lfp_fname, str):
+                fpath_complete = os.path.join(folder, lfp_fname)
+                if not os.path.exists(fpath_complete):
+                    print(f"Could not find {fpath_complete}")
+                    count_not_found += 1
+            if isinstance(facecam_fname, str):
+                fpath_complete = os.path.join(folder, facecam_fname)
+                if not os.path.exists(fpath_complete):
+                    print(f"Could not find {fpath_complete}")
+                    count_not_found += 1
+            if isinstance(nikonmeta_fname, str):
+                fpath_complete = os.path.join(folder, nikonmeta_fname)
+                if not os.path.exists(fpath_complete):
+                    print(f"Could not find {fpath_complete}")
+                    count_not_found += 1
+        print(f"Total: {count_not_found} missing files.")
 
     def loadDataDoc(self):
         # reset the dataframes
@@ -95,6 +134,13 @@ class DataDocumentation:
         if self.WIN_INJ_TYPES_DF is None:
             raise Exception(f"Error: window_injection_types_sides.xlsx was not found in data documentation! \
             Possible reason is the changed structure of data documentation. This file was moved out of 'documentation'. Do not move it back!")
+
+    def setDataDriveSymbol(self, symbol: str=None):
+        if isinstance(symbol, str):
+            assert len(symbol) == 1
+            assert symbol.upper() == symbol
+            self.GROUPING_DF.folder = self.GROUPING_DF.apply(lambda row: symbol + row["folder"][1:], axis=1)
+            print(f"Changed drive symbol to {symbol}")
 
     def getIdUuid(self):
         if self.GROUPING_DF is not None:
