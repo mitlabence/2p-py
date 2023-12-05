@@ -164,6 +164,55 @@ class TwoPhotonSession:
             setattr(self, attribute_name, None)
 
     @classmethod
+    def init_and_process_uuid(cls, uuid: str = None, matlab_2p_folder: str = None):
+        """
+        Instantiate a TwoPhotonSession object by defining the uuid and perform the processing steps automatically.
+        The files will be located using the 2p-py/.env file, DATA_DOCU_FOLDER entry.
+        :param uuid: The hexadecimal representation of the uuid as string. Example: "04b8cfbfa1c347058bb139b4661edcf1"
+        :param matlab_2p_folder: folder of matlab scripts (e.g. C:/matlab-2p/). If None, the 2p-py/.env file MATLAB_2P_FOLDER will be used.
+        :return: The two photon session instance.
+        """
+        import datadoc_util as ddu  # import TwoPhotonSession from 2p-py folder (default use case of 2p-py). Otherwise absolute path here necessary!
+        env_dict = dict()
+        if not os.path.exists("./.env"):
+            raise Exception(".env does not exist")
+        else:
+            with open("./.env", "r") as f:
+                for line in f.readlines():
+                    l = line.rstrip().split("=")
+                    env_dict[l[0]] = l[1]
+        if "DATA_DOCU_FOLDER" in env_dict.keys():
+            data_docu_folder = env_dict["DATA_DOCU_FOLDER"]
+        else:
+            raise Exception(".env file does not contain DATA_DOCU_FOLDER.")
+        datadoc = ddu.DataDocumentation(data_docu_folder)
+        datadoc.loadDataDoc()
+        session_files = datadoc.getSessionFilesForUuid(uuid)
+        folder = session_files["folder"].iloc[0]
+        nd2_fpath = session_files["nd2"].iloc[0]
+        if isinstance(nd2_fpath, str):
+            nd2_fpath = os.path.join(folder, nd2_fpath)
+        nd2_timestamps_fpath = session_files["nikon_meta"].iloc[0]
+        if isinstance(nd2_timestamps_fpath, str):
+            nd2_timestamps_fpath = os.path.join(folder, nd2_timestamps_fpath)
+        labview_fpath = session_files["labview"].iloc[0]
+        if isinstance(labview_fpath, str):
+            labview_fpath = os.path.join(folder, labview_fpath)
+        labview_timestamps_fpath = os.path.splitext(labview_fpath)[0] + "time.txt"
+        if isinstance(labview_timestamps_fpath, str):
+            labview_timestamps_fpath = os.path.join(folder, labview_timestamps_fpath)
+        lfp_fpath = session_files["lfp"].iloc[0]
+        if isinstance(lfp_fpath, str):
+            lfp_fpath = os.path.join(folder, lfp_fpath)
+        if matlab_2p_folder is None:
+            matlab_2p_folder = env_dict["MATLAB_2P_FOLDER"]
+        return cls.init_and_process(nd2_path=nd2_fpath, nd2_timestamps_path=nd2_timestamps_fpath, labview_path=labview_fpath, labview_timestamps_path=labview_timestamps_fpath, lfp_path=lfp_fpath, matlab_2p_folder=matlab_2p_folder)
+        #except Exception:
+        #    print("Setting up datadoc_util failed.")
+        #    return None
+
+
+    @classmethod
     def init_and_process(cls, nd2_path: str = None, nd2_timestamps_path: str = None, labview_path: str = None,
                          labview_timestamps_path: str = None,
                          lfp_path: str = None, matlab_2p_folder: str = None, uuid: str = None, **kwargs):
@@ -177,7 +226,7 @@ class TwoPhotonSession:
         :param matlab_2p_folder: folder of matlab scripts (e.g. C:/matlab-2p/)
         :param uuid: uuid from data documentation (if exists)
 
-        :return: None
+        :return: The two photon session instance.
         """
         # infer rest of class attributes automatically.
         instance = cls(nd2_path=nd2_path,
@@ -460,8 +509,7 @@ class TwoPhotonSession:
         if len(array.shape) == 1:
             return array
         elif len(array.shape) == 2 and array.shape[0] == 1:
-            print(
-                f"Matlab possibly messed up an array, shape {array.shape} detected; should probably be ({array.shape[1]},). attempting to remove the redundant dimension...")
+            #print(f"Matlab possibly messed up an array, shape {array.shape} detected; should probably be ({array.shape[1]},). attempting to remove the redundant dimension...")
             return array[0]
 
     def drop_nan_cols(self, dataframe: pd.DataFrame):
