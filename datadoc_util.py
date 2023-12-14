@@ -308,7 +308,7 @@ class DataDocumentation:
             raise Exception(
                 "datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate "
                 "DataDocumentation object")
-    def getSessionFilesForUuuid(self, uuid):
+    def getSessionFilesForUuid(self, uuid):
         if self.GROUPING_DF is not None:
             return self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid]
         else:
