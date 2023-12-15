@@ -319,9 +319,9 @@ class DataDocumentation:
                 nd2 = grouping_entry.nd2
                 return os.path.join(folder, nd2)
             elif isinstance(uuid, list) or isinstance(uuid, np.ndarray):
-                grouping_entries = self.GROUPING_DF[self.GROUPING_DF["uuid"].isin(uuid)]
                 fpath_list = []
-                for i_entry, entry in grouping_entries.iterrows():
+                for i_entry in range(len(uuid)):
+                    entry = self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid[i_entry]].iloc[0]
                     folder = entry.folder
                     nd2 = entry.nd2
                     fpath_list.append(os.path.join(folder, nd2))
