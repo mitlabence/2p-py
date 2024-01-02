@@ -187,6 +187,8 @@ class TwoPhotonSession:
             raise Exception(".env file does not contain DATA_DOCU_FOLDER.")
         datadoc = ddu.DataDocumentation(data_docu_folder)
         datadoc.loadDataDoc()
+        if "SERVER_SYMBOL" in env_dict.keys():
+            datadoc.setDataDriveSymbol(env_dict["SERVER_SYMBOL"])
         session_files = datadoc.getSessionFilesForUuid(uuid)
         folder = session_files["folder"].iloc[0]
         nd2_fpath = session_files["nd2"].iloc[0]
@@ -204,6 +206,8 @@ class TwoPhotonSession:
         lfp_fpath = session_files["lfp"].iloc[0]
         if isinstance(lfp_fpath, str):
             lfp_fpath = os.path.join(folder, lfp_fpath)
+        else:
+            lfp_fpath = None
         if matlab_2p_folder is None:
             matlab_2p_folder = env_dict["MATLAB_2P_FOLDER"]
         return cls.init_and_process(nd2_path=nd2_fpath, nd2_timestamps_path=nd2_timestamps_fpath, labview_path=labview_fpath, labview_timestamps_path=labview_timestamps_fpath, lfp_path=lfp_fpath, matlab_2p_folder=matlab_2p_folder)
@@ -239,7 +243,10 @@ class TwoPhotonSession:
         # convert matlab arrays into numpy arrays
         if instance.belt_dict is not None:
             for k, v in instance.belt_dict.items():
-                instance.belt_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_dict[k])
+                if instance.belt_dict[k] is None:
+                    instance.belt_dict[k] = np.array([])
+                else:
+                    instance.belt_dict[k] = instance._matlab_array_to_numpy_array(instance.belt_dict[k])
             instance.belt_dict["dt"] = instance._lv_dt(instance.belt_dict["time"])
             # instance.belt_dict["dt_tsscn"] = instance._lv_dt(instance.belt_dict["tsscn"])
             instance.belt_dict["totdist_abs"] = instance._lv_totdist_abs(instance.belt_dict["speed"],

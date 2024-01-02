@@ -2,6 +2,7 @@ import labrotation.file_handling as fh
 import os
 import pandas as pd
 from collections.abc import Iterable
+import numpy as np
 
 # TODO: a module is less complicated, but setting
 #   %load_ext autoreload
@@ -18,6 +19,7 @@ class DataDocumentation:
     DATADOC_FOLDER = None
     GROUPING_DF = None  # df containing files belonging together in a session
     SEGMENTATION_DF = None  # df containing segmentation
+    COLORINGS_DF = None  # df containing color code for each mouse ID
     WIN_INJ_TYPES_DF = None  # df containing window side, type, injection side, type.
     EVENTS_DF = None  # df containing all events and the corresponding metadata
     SEGMENTS_CNMF_CATS = {"normal": True, "iis": False, "sz": False, "sz_like": False, "sd_wave": False,
@@ -134,6 +136,7 @@ class DataDocumentation:
         if self.WIN_INJ_TYPES_DF is None:
             raise Exception(f"Error: window_injection_types_sides.xlsx was not found in data documentation! \
             Possible reason is the changed structure of data documentation. This file was moved out of 'documentation'. Do not move it back!")
+        self.COLORINGS_DF = self.getColorings()
 
     def setDataDriveSymbol(self, symbol: str=None):
         if isinstance(symbol, str):
@@ -308,6 +311,27 @@ class DataDocumentation:
             raise Exception(
                 "datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate "
                 "DataDocumentation object")
+    def getNikonFilePathForUuid(self, uuid):
+        if self.GROUPING_DF is not None:
+            if isinstance(uuid, str):
+                grouping_entry =  self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].iloc[0]
+                folder = grouping_entry.folder
+                nd2 = grouping_entry.nd2
+                return os.path.join(folder, nd2)
+            elif isinstance(uuid, list) or isinstance(uuid, np.ndarray):
+                fpath_list = []
+                for i_entry in range(len(uuid)):
+                    entry = self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid[i_entry]].iloc[0]
+                    folder = entry.folder
+                    nd2 = entry.nd2
+                    fpath_list.append(os.path.join(folder, nd2))
+                return fpath_list
+            else:
+                raise Exception(f"uuid has type {type(uuid)}; needs to be str or list[str]!")
+        else:
+            raise Exception(
+                "datadoc_util.DataDocumentation.getIdUuid: You need to run loadDataDoc() first to populate "
+                "DataDocumentation object")
     def getSessionFilesForUuid(self, uuid):
         if self.GROUPING_DF is not None:
             return self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid]
@@ -326,6 +350,18 @@ class DataDocumentation:
         nd2_file = self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].nd2.values[0]
         return self.SEGMENTATION_DF[(self.SEGMENTATION_DF["nd2"] == nd2_file) & (self.SEGMENTATION_DF["frame_begin"] <= frame) & (self.SEGMENTATION_DF["frame_end"] >= frame)]
 
+    def getColorForMouseId(self, mouse_id):
+        if self.COLORINGS_DF is not None:
+            if mouse_id in self.COLORINGS_DF.mouse_id.unique():
+                return self.COLORINGS_DF[self.COLORINGS_DF["mouse_id"] == mouse_id].iloc[0].color
+            else:
+                raise Exception(f"Color code for ID {mouse_id} not found")
+        else:
+            raise Exception("Color codes not yet loaded.")
+    def getColorForUuid(self, uuid):
+        mouse_id = self.getMouseIdForUuid(uuid)
+        color = self.getColorForMouseId(mouse_id)
+        return color
     def getRecordingsWithExperimentType(self, experiment_types="fov_dual"):
         """
         Return all grouping info of recordings with the defined experiment_type,
