@@ -56,3 +56,17 @@ Setting it to 2 or higher will suppress the warning messages totally.
 [I 13:39:58.850 NotebookApp] Saving file at /Extract 15 min stimulation recordings.ipynb
 Headers are 1.10.6, library is 1.10.8" (with much more details following)
 
+
+----------------------------------
+When creating a new conda environment, installing any package might fail due to missing OpenSSL on the computer.
+This might not be true (if other environments work, then it is definitely wrong). See:
+https://stackoverflow.com/questions/55185945/any-conda-or-pip-operation-give-ssl-error-in-windows-10
+
+"""
+Copy existing dlls from \bin to \DLLs
+Copy libcrypto-1_1-x64.dll and libssl-1_1-x64.dll
+from C:\Users\username\miniconda3\Library\bin
+to C:\Users\username\miniconda3\DLLs
+"""
+
+----------------------------------
