@@ -25,11 +25,11 @@ class DataDocumentation:
     SEGMENTS_CNMF_CATS = {"normal": True, "iis": False, "sz": False, "sz_like": False, "sd_wave": False,
                           "sd_extinction": False,
                           "fake_handling": False, "sd_wave_delayed": False, "sd_extinction_delayed": False,
-                          "stimulation": False, "sd_wave_cx": False}
+                          "stimulation": False, "sd_wave_cx": False, "window_moved": False, "artifact": False}
     SEGMENTS_MOCO_CATS = {"normal": True, "iis": True, "sz": True, "sz_like": True, "sd_wave": True,
                           "sd_extinction": True,
                           "fake_handling": True, "sd_wave_delayed": True, "sd_extinction_delayed": True,
-                          "stimulation": False, "sd_wave_cx": True}
+                          "stimulation": False, "sd_wave_cx": True, "window_moved": True, "artifact": False}
 
     def __init__(self, datadoc_folder: str = None):
         if datadoc_folder is None:
