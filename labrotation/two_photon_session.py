@@ -1032,16 +1032,17 @@ class TwoPhotonSession:
                 lfp_df_cut_group = inferred_group.create_group("lfp_df_cut")
                 for col_name in self.lfp_df_cut.keys():
                     lfp_df_cut_group[col_name] = self.lfp_df_cut[col_name].to_numpy()
+            # belt_df and belt_scn_df are duplicates of belt_dict and belt_scn_dict, no need to save them.
             # save belt_df
-            if self.belt_df is not None and save_full:
-                belt_df_group = inferred_group.create_group("belt_df")
-                for col_name in self.belt_df.keys():
-                    belt_df_group[col_name] = self.belt_df[col_name].to_numpy()
+            #if self.belt_df is not None and save_full:
+            #    belt_df_group = inferred_group.create_group("belt_df")
+            #    for col_name in self.belt_df.keys():
+            #        belt_df_group[col_name] = self.belt_df[col_name].to_numpy()
             # save belt_scn_df
-            if self.belt_scn_df is not None and save_full:
-                belt_scn_df_group = inferred_group.create_group("belt_scn_df")
-                for col_name in self.belt_scn_df.keys():
-                    belt_scn_df_group[col_name] = self.belt_scn_df[col_name].to_numpy()
+            #if self.belt_scn_df is not None and save_full:
+            #    belt_scn_df_group = inferred_group.create_group("belt_scn_df")
+            #    for col_name in self.belt_scn_df.keys():
+            #        belt_scn_df_group[col_name] = self.belt_scn_df[col_name].to_numpy()
 
             if self.nikon_meta is not None and save_full:
                 nikon_meta_group = inferred_group.create_group("nikon_meta")
