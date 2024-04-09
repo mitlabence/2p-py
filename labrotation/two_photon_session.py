@@ -194,9 +194,15 @@ class TwoPhotonSession:
         nd2_fpath = session_files["nd2"].iloc[0]
         if isinstance(nd2_fpath, str):
             nd2_fpath = os.path.join(folder, nd2_fpath)
+        else:
+            print(f"{uuid}: nd2 file path is {nd2_fpath}, type of {type(nd2_fpath)}. Assuming no Nikon file available...")
+            nd2_fpath = None
         nd2_timestamps_fpath = session_files["nikon_meta"].iloc[0]
         if isinstance(nd2_timestamps_fpath, str):
             nd2_timestamps_fpath = os.path.join(folder, nd2_timestamps_fpath)
+        else:
+            print(f"{uuid}: No nikon timestamps file found. Assuming none available...")
+            nd2_timestamps_fpath = None
         labview_fpath = session_files["labview"].iloc[0]
         if isinstance(labview_fpath, str):
             labview_fpath = os.path.join(folder, labview_fpath)
