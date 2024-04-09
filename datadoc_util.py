@@ -210,8 +210,9 @@ class DataDocumentation:
             # if imaging contralateral to injection, injection is always towards medial side
             return "top" if top_dir == "medial" else "bottom"
         else:  # some mice have window on both hemispheres
-            raise NotImplementedError(
-                "datadoc_util: getInjectionDirection: only left and right windows, contralateral injections have been implemented.")
+            return "same"
+            #raise NotImplementedError(
+            #    "datadoc_util: getInjectionDirection: only left and right windows, contralateral injections have been implemented.")
 
     def getUUIDForFile(self, fpath):
         fname = os.path.split(fpath)[-1]
