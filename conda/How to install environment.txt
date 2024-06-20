@@ -18,7 +18,7 @@ conda install statsmodels
 conda install multiprocess  # alternative to multiprocessing that works with IPython (Jupyter notebook, presumably also anaconda prompt). https://stackoverflow.com/questions/41385708/multiprocessing-example-giving-attributeerror
 
 pip install pyabf  (2.3.7)
-pip install pims==0.5.0 (0.5.0, needs VC++ redist!)
+pip install pims==0.5.0 (0.5.0, needs VC++ redist 2008!)
 pip install pims_nd2 (1.1, ONLY after installing pims. At this time, the latest pims, pims 0.6.1, breaks the installation with WinError 14001)
 pip install numba (or conda install numba) (0.56.4)
 pip install tables (for pandas df.to_hdf() )
@@ -34,7 +34,7 @@ ffmpeg needs to be installed for exporting videos. (e. g. Play nd2 along LFP, mo
 	Even extracting there does not work easily). Then add the bin folder to the Path environmental variable (Edit the system environment variables). 
 	Need to restart the prompt (Anaconda prompt) afterwards! Run ffmpeg and see if it works. If yes, ffmpeg should be installed. 
 	Test the python library too (import ffmpeg) before using it.
-Make sure to install VC++ redist! pims and pims_nd2 require it.
+Make sure to install VC++ redist 2008! pims and pims_nd2 require it. https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170 Otherwise, VC90.CRT will have issues (sxstrace can help confirm this). Might also need the latest VC++ redist.
 	
 	
 The manually installed packages:
