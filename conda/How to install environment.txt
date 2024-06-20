@@ -18,7 +18,7 @@ conda install statsmodels
 conda install multiprocess  # alternative to multiprocessing that works with IPython (Jupyter notebook, presumably also anaconda prompt). https://stackoverflow.com/questions/41385708/multiprocessing-example-giving-attributeerror
 
 pip install pyabf  (2.3.7)
-pip install pims==0.5.0 (0.5.0)
+pip install pims==0.5.0 (0.5.0, needs VC++ redist!)
 pip install pims_nd2 (1.1, ONLY after installing pims. At this time, the latest pims, pims 0.6.1, breaks the installation with WinError 14001)
 pip install numba (or conda install numba) (0.56.4)
 pip install tables (for pandas df.to_hdf() )
