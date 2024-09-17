@@ -415,3 +415,9 @@ class DataDocumentation:
 
     def getExperimentTypeForUuid(self, uuid):
         return self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].experiment_type.iloc[0]
+
+    def getStimDurationForUuid(self, uuid):
+        """
+        Return the stim duration in seconds.
+        """
+        return self.GROUPING_DF[self.GROUPING_DF["uuid"] == uuid].stim_length.iloc[0]
