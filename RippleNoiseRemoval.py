@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from nd2_to_caiman import np_arr_from_nd2
 from typing import Tuple
 import multiprocess as mp  # multiprocessing does not work with IPython. Use fork instead.
+import warnings
 
 """
 # optional: show original figure of which plot is made
@@ -33,6 +34,15 @@ class RNR():
         # assert(self.n_threads <= cpu_count())
 
     def open_recording(self, nd2_fpath, begin_end_frames: Tuple[int, int] = None):
+        """
+
+        :param nd2_fpath: String
+            The absolute path to the nd2 file.
+        :param begin_end_frames: Tuple(int, int), List[Tuple(int, int)] or List[List[int, int]]
+            A tuple or a list of tuples/lists of beginning and end frames (both inclusive, starting with 1, i.e. "one-indexed"). (1,5) reads frames #1 to (including) #5;
+            [(1, 2), [5, 10]] reads frames #1 to #2, and #5 to #10. [(1, 1)] reads frame #1.
+        :return: None
+        """
         self.nd2_data = np_arr_from_nd2(nd2_fpath, begin_end_frames)
         self.rnr_data = np.empty(self.nd2_data.shape, dtype=np.float64)
         self.n_frames = self.nd2_data.shape[0]
