@@ -36,8 +36,9 @@ def np_arr_from_nd2(nd2_fpath: str, begin_end_frames: Tuple[int, int]=None):
                 for begin_end_frame in begin_end_frames:
                     if len(begin_end_frame) != 2:  # 1.
                         raise ValueError(f"Expected begin_end_frames to contain lists or tuples of 2 ints, found {len(begin_end_frame)}: {begin_end_frame}")
-                    if not (isinstance(begin_end_frame[0], int) and isinstance(begin_end_frame[1], int)):  # 2.
-                        raise ValueError(f"Expected begin_end_frames to contain lists or tuples of ints, found types {type(begin_end_frame[0])}, {type(begin_end_frame[1])}")
+                    # TODO: add proper working dtpye check that allows int and np.int*, maybe even np.uint*
+                    #if not (np.issubdtype(type(begin_end_frame[0]), int) and np.issubdtype(type(begin_end_frame[1]), int)):  # 2.
+                    #    raise ValueError(f"Expected begin_end_frames to contain lists or tuples of ints, found types {type(begin_end_frame[0])}, {type(begin_end_frame[1])}")
                     if begin_end_frame[0] > begin_end_frame[1]:  # 3.
                         raise ValueError(f"begin_end_frames: begin frame greater than end frame: {begin_end_frame}")
                     if i_segment > 0:
