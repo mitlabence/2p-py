@@ -62,3 +62,10 @@ def sha256_dir_to_txt(directory: str, output_fpath: str) -> None:
 # output_filepath = fh.choose_dir_for_saving_file("Choose folder to save results", filename)
 # input_directory = fh.open_dir("Choose directory to run SHA256 on")
 # sha256_dir_to_txt(input_directory, output_filepath)
+
+def md5_of_file(fpath: str) -> str:
+    md5_hash = hashlib.md5()
+    with open(fpath, "rb") as f:
+        file_content = f.read()
+        md5_hash.update(file_content)
+    return md5_hash.hexdigest()
