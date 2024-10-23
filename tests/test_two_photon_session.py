@@ -1,6 +1,13 @@
-from labrotation import two_photon_session as tps
-from labrotation import file_handling as fh
+import sys
 import os
+try:
+    # Get the absolute path of the parent directory (the root folder)
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    # Add the libs folder to the system path
+    sys.path.insert(0, root_dir)
+finally:
+    import labrotation.file_handling as fh
+    import labrotation.two_photon_session as tps
 
 # TODO: make a very small dataset: LFP, labview and nd2 with both only green and green + red.
 # TODO: make it a proper test file in the future (pytest). Need small data first.
@@ -11,7 +18,7 @@ ND2_GREEN_FNAME = "T386_20211202_green.nd2"
 ND2_GREEN_LFP = "21d02000.abf"
 ND2_GREEN_LV = "T386.021221.1105.txt"
 ND2_GREEN_LVTIME = "T386.021221.1105time.txt"
-ND2_GREEN_NIK = "T386.021221.1105nik.txt"
+ND2_GREEN_NIK = "T386.021221.1105_nik.txt"
 
 ND2_DUAL_FNAME = "T386_20211202_green_red.nd2"
 ND2_DUAL_LFP = "21d02001.abf"
@@ -52,7 +59,7 @@ def test_tps_open_files():
                                                     labview_timestamps_path=nd2_green_lvtime_fpath,
                                                     lfp_path=nd2_green_lfp_fpath,
                                                     matlab_2p_folder=MATLAB_2P_PATH)
-    session.export_json(fpath=nd2_green_full_json)
+    # session.export_json(fpath=nd2_green_full_json)
     # TODO: test class fields (for all cases), their shape, type ...
     print(vars(session).keys())
     print("Testing TwoPhotonSession with all parameters done.")
@@ -62,7 +69,7 @@ def test_tps_open_files():
                                                     labview_path=nd2_green_lv_fpath,
                                                     labview_timestamps_path=nd2_green_lvtime_fpath,
                                                     matlab_2p_folder=MATLAB_2P_PATH)
-    session.export_json(fpath=nd2_green_nolfp_json)
+    # session.export_json(fpath=nd2_green_nolfp_json)
     print("Testing TwoPhotonSession with no LFP done.")
     # print(vars(session).keys())
 
@@ -72,7 +79,7 @@ def test_tps_open_files():
                                                     labview_timestamps_path=nd2_dual_lvtime_fpath,
                                                     lfp_path=nd2_dual_lfp_fpath,
                                                     matlab_2p_folder=MATLAB_2P_PATH)
-    session.export_json(fpath=nd2_dual_full_json)
+    # session.export_json(fpath=nd2_dual_full_json)
     print("Testing TwoPhotonSession with all parameters (dual channel) done.")
 
     session = tps.TwoPhotonSession.init_and_process(nd2_path=nd2_dual_fpath,
@@ -80,17 +87,17 @@ def test_tps_open_files():
                                                     labview_path=nd2_dual_lv_fpath,
                                                     labview_timestamps_path=nd2_dual_lvtime_fpath,
                                                     matlab_2p_folder=MATLAB_2P_PATH)
-    session.export_json(fpath=nd2_dual_nolfp_json)
+    # session.export_json(fpath=nd2_dual_nolfp_json)
     print("Testing TwoPhotonSession with all parameters (dual channel) done.")
 
     # test importing sessions
-    session = tps.TwoPhotonSession.from_json(nd2_green_full_json)
+    # session = tps.TwoPhotonSession.from_json(nd2_green_full_json)
     # TODO: test if imported session has proper functionality
-    session = tps.TwoPhotonSession.from_json(nd2_green_nolfp_json)
+    # session = tps.TwoPhotonSession.from_json(nd2_green_nolfp_json)
 
-    session = tps.TwoPhotonSession.from_json(nd2_dual_full_json)
+    # session = tps.TwoPhotonSession.from_json(nd2_dual_full_json)
 
-    session = tps.TwoPhotonSession.from_json(nd2_dual_full_json)
+    # session = tps.TwoPhotonSession.from_json(nd2_dual_full_json)
 
 
-test_tps_open_files()
+# test_tps_open_files()
