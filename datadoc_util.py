@@ -1,14 +1,10 @@
 import labrotation.file_handling as fh
 import os
 import pandas as pd
-from collections.abc import Iterable
 import numpy as np
 import duckdb
 
-# TODO: a module is less complicated, but setting
-#   %load_ext autoreload
-#   %autoreload 2
-# in jupyter causes module to reload, constantly resetting the folders.
+# TODO: reading from duckdb results in categorical values for many columns (for example, SEGMENTATION_DF.interval_type). This might lead to unexpected behavior.
 
 
 class DataDocumentation:
@@ -102,18 +98,31 @@ class DataDocumentation:
         elif os.path.isdir(self._DATADOC_PATH):
             self._loadFromFolder()
 
+    def _uuidToString(self, df, column_name):
+        return df[column_name].apply(
+            lambda uuid: uuid if uuid is np.NaN else uuid.hex)
+
     def _loadFromFile(self):
         """Load the data documentation from a duckdb file. No check for file existence is done here, as it is done in __init__.
         """
         conn = duckdb.connect(self._DATADOC_PATH)
-        self.GROUPING_DF = conn.execute("SELECT * FROM grouping").fetchdf()
+        self.GROUPING_DF = conn.execute(
+            "SELECT * FROM grouping").fetchdf().fillna(np.NaN)
         self.SEGMENTATION_DF = conn.execute(
-            "SELECT * FROM segmentation").fetchdf()
+            "SELECT * FROM segmentation").fetchdf().fillna(np.NaN)
         self.WIN_INJ_TYPES_DF = conn.execute(
-            "SELECT * FROM win_inj_types").fetchdf()
-        self.EVENTS_DF = conn.execute("SELECT * FROM events").fetchdf()
+            "SELECT * FROM win_inj_types").fetchdf().fillna(np.NaN)
+        self.EVENTS_DF = conn.execute(
+            "SELECT * FROM events").fetchdf().fillna(np.NaN)
         self.COLORINGS_DF = conn.execute(
-            "SELECT * FROM colors").fetchdf()
+            "SELECT * FROM colors").fetchdf().fillna(np.NaN)
+        # format uuid columns
+        self.GROUPING_DF["uuid"] = self._uuidToString(
+            self.GROUPING_DF, "uuid")
+        self.EVENTS_DF["event_uuid"] = self._uuidToString(
+            self.EVENTS_DF, "event_uuid")
+        self.EVENTS_DF["recording_uuid"] = self._uuidToString(
+            self.EVENTS_DF, "recording_uuid")
 
     def _loadFromFolder(self):
         # reset the dataframes
@@ -153,6 +162,13 @@ class DataDocumentation:
             raise Exception(f"Error: window_injection_types_sides.xlsx was not found in data documentation! \
             Possible reason is the changed structure of data documentation. This file was moved out of 'documentation'. Do not move it back!")
         self.COLORINGS_DF = self.getColorings()
+        # adjust data types to match duckdb types
+        self.GROUPING_DF.stim_length = self.GROUPING_DF.stim_length.astype(
+            np.float32)  # reduce float64 to 32
+        self.SEGMENTATION_DF.frame_begin = self.SEGMENTATION_DF.frame_begin.astype(
+            np.int32)
+        self.SEGMENTATION_DF.frame_end = self.SEGMENTATION_DF.frame_end.astype(
+            np.int32)
 
     def setDataDriveSymbol(self, symbol: str = None):
         if isinstance(symbol, str):
