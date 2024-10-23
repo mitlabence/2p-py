@@ -3,6 +3,7 @@ import os
 import pandas as pd
 from collections.abc import Iterable
 import numpy as np
+import duckdb
 
 # TODO: a module is less complicated, but setting
 #   %load_ext autoreload
@@ -17,7 +18,7 @@ class DataDocumentation:
     These categories should be exactly the unique categories appearing in the [mouse-id]_segmentation.xlsx files, or,
     once SEGMENTATION_DF contains all this data, in SEGMENTATION_DF["interval_type"].unique().
     """
-    DATADOC_FOLDER = None
+    _DATADOC_PATH = None
     GROUPING_DF = None  # df containing files belonging together in a session
     SEGMENTATION_DF = None  # df containing segmentation
     COLORINGS_DF = None  # df containing color code for each mouse ID
@@ -33,11 +34,19 @@ class DataDocumentation:
                           "fake_handling": True, "sd_wave_delayed": True, "sd_extinction_delayed": True,
                           "stimulation": False, "sd_wave_cx": True, "window_moved": True, "artifact": False}
 
-    def __init__(self, datadoc_folder: str = None):
-        if datadoc_folder is None:
-            self.DATADOC_FOLDER = fh.open_dir("Open data documentation")
+    def __init__(self, datadoc_path: str = None):
+        if datadoc_path is None:
+            self._DATADOC_PATH = fh.open_dir("Open data documentation")
         else:
-            self.DATADOC_FOLDER = datadoc_folder
+            self._DATADOC_PATH = datadoc_path
+        # make sure either folder or duckdb file is given, and that it exists
+        if os.path.isdir(self._DATADOC_PATH) and not os.path.exists(self._DATADOC_PATH):
+            raise NotADirectoryError(
+                f"{self._DATADOC_PATH} is not a valid directory.")
+        elif os.path.isfile(
+                self._DATADOC_PATH) and not os.path.splitext(self._DATADOC_PATH)[-1] == ".duckdb":
+            raise FileNotFoundError(
+                f"{self._DATADOC_PATH} is not a valid duckdb file.")
 
     def checkCategoryConsistency(self):
         n_segments = len(self.SEGMENTATION_DF["interval_type"].unique())
@@ -56,7 +65,7 @@ class DataDocumentation:
         print("DataDocumentation.checkCategoryConsistency(): Categories seem consistent.")
 
     def loadDataDocTest(self):
-        for root, dirs, files in os.walk(self.DATADOC_FOLDER):
+        for root, dirs, files in os.walk(self._DATADOC_PATH):
             for name in files:
                 if "grouping" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
@@ -78,36 +87,37 @@ class DataDocumentation:
             lfp_fname = grouping_row["lfp"]
             facecam_fname = grouping_row["face_cam_last"]
             nikonmeta_fname = grouping_row["nikon_meta"]
-            if isinstance(nd2_fname, str):
-                fpath_complete = os.path.join(folder, nd2_fname)
-                if not os.path.exists(fpath_complete):
-                    print(f"Could not find {fpath_complete}")
-                    count_not_found += 1
-            if isinstance(lv_fname, str):
-                fpath_complete = os.path.join(folder, lv_fname)
-                if not os.path.exists(fpath_complete):
-                    print(f"Could not find {fpath_complete}")
-                    count_not_found += 1
-            if isinstance(lfp_fname, str):
-                fpath_complete = os.path.join(folder, lfp_fname)
-                if not os.path.exists(fpath_complete):
-                    print(f"Could not find {fpath_complete}")
-                    count_not_found += 1
-            if isinstance(facecam_fname, str):
-                fpath_complete = os.path.join(folder, facecam_fname)
-                if not os.path.exists(fpath_complete):
-                    print(f"Could not find {fpath_complete}")
-                    count_not_found += 1
-            if isinstance(nikonmeta_fname, str):
-                fpath_complete = os.path.join(folder, nikonmeta_fname)
-                if not os.path.exists(fpath_complete):
-                    print(f"Could not find {fpath_complete}")
-                    count_not_found += 1
+            for fname in [nd2_fname, lv_fname, lfp_fname, facecam_fname, nikonmeta_fname]:
+                if isinstance(fname, str):
+                    fpath_complete = os.path.join(folder, fname)
+                    if not os.path.exists(fpath_complete):
+                        print(f"Could not find {fpath_complete}")
+                        count_not_found += 1
         print(f"Total: {count_not_found} missing files.")
 
     def loadDataDoc(self):
+        # check of existance was done above in __init__
+        if os.path.isfile(self._DATADOC_PATH):
+            self._loadFromFile()
+        elif os.path.isdir(self._DATADOC_PATH):
+            self._loadFromFolder()
+
+    def _loadFromFile(self):
+        """Load the data documentation from a duckdb file. No check for file existence is done here, as it is done in __init__.
+        """
+        conn = duckdb.connect(self._DATADOC_PATH)
+        self.GROUPING_DF = conn.execute("SELECT * FROM grouping").fetchdf()
+        self.SEGMENTATION_DF = conn.execute(
+            "SELECT * FROM segmentation").fetchdf()
+        self.WIN_INJ_TYPES_DF = conn.execute(
+            "SELECT * FROM win_inj_types").fetchdf()
+        self.EVENTS_DF = conn.execute("SELECT * FROM events").fetchdf()
+        self.COLORINGS_DF = conn.execute(
+            "SELECT * FROM colors").fetchdf()
+
+    def _loadFromFolder(self):
         # reset the dataframes
-        for root, dirs, files in os.walk(self.DATADOC_FOLDER):
+        for root, dirs, files in os.walk(self._DATADOC_PATH):
             for name in files:
                 if "grouping" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
@@ -165,7 +175,7 @@ class DataDocumentation:
         :return: pandas dataframe
         """
         color_coding_fpath = os.path.join(
-            self.DATADOC_FOLDER, "color coding.xlsx")
+            self._DATADOC_PATH, "color coding.xlsx")
         if os.path.exists(color_coding_fpath):
             return pd.read_excel(color_coding_fpath)
         else:
