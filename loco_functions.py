@@ -1,5 +1,6 @@
-import numpy as np
+from typing import Optional
 import warnings
+import numpy as np
 
 
 def apply_threshold(speed_trace, episodes, temporal_threshold, amplitude_threshold):
@@ -129,21 +130,35 @@ def get_episodes(segment, merge_episodes=False, merge_threshold_frames=8, return
         return episode_lengths  # len() shows n_episodes
 
 
-def calculate_avg_speed(speed_trace):
-    """Given a speed trace list or numpy array, calculate the average absolute speed. Resting periods where speed=0 are ignored.
+def calculate_avg_speed(speed_trace, mask: Optional[np.array] = None):
+    """Given a speed trace list or numpy array, calculate the average absolute speed.
+    Frames where mask != 1 are ignored.
 
     Parameters
     ----------
     speed_trace : iterable, list[float] or np.array(float)
         A 1D list or numpy array of speed values (float)
-
+    mask : Optional, np.array(int)
+        A 1D list with same shape as speed_trace, where 1 indicates a frame to be included in the
+        calculation, and 0 indicates a frame to be ignored. If None, all frames are included.
+        If values other than 0 and 1 are present, they are interpreted as a 0.
+        By default None.
     Returns
     -------
     float
         The average apsolute speed over the whole trace
+    Raises
+    ------
+    ValueError
+        If speed_trace and mask do not have the same shape.
     """
     speed_trace = np.array(speed_trace)
-    return np.mean(np.abs(speed_trace[speed_trace > 0]))
+    if mask is not None:
+        mask = np.array(mask == 1)
+    if speed_trace.shape != mask.shape:
+        raise ValueError(
+            "calculate_avg_speed(): speed_trace and mask must have the same shape!")
+    return np.mean(np.abs(speed_trace[mask]))
 
 
 def calculate_max_speed(speed_trace):
