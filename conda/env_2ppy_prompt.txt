@@ -169,7 +169,7 @@ m2w64-libwinpthread-git=5.0.0.4634.697f757=2
 mamba=0.20.0=py38hecfeebb_0
 markdown=3.3.6=pyhd8ed1ab_0
 markupsafe=1.1.1=py38he774522_0
-matlabengineforpython=9.14=pypi_0
+matlabengineforpython=R2020b=pypi_0
 matplotlib=3.5.1=py38haa244fe_0
 matplotlib-base=3.5.1=py38h1f000d6_0
 matplotlib-inline=0.1.3=pyhd8ed1ab_0
