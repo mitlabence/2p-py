@@ -4,19 +4,19 @@ import pandas as pd
 import numpy as np
 import duckdb
 
-# TODO: reading from duckdb results in categorical values for many columns (for example, SEGMENTATION_DF.interval_type). This might lead to unexpected behavior.
+# TODO: reading from duckdb results in categorical values for many columns (for example, ANNOTATION_DF.interval_type). This might lead to unexpected behavior.
 
 
 class DataDocumentation:
     """
     SEGMENTS_CNMF_CATS and SEGMENTS_MOCO_CATS assign to each category appearing in the data documentation
-    (segmentation) the boolean value whether the CNMF and MoCo can or should run on segments belonging in that category.
-    These categories should be exactly the unique categories appearing in the [mouse-id]_segmentation.xlsx files, or,
-    once SEGMENTATION_DF contains all this data, in SEGMENTATION_DF["interval_type"].unique().
+    (annotation) the boolean value whether the CNMF and MoCo can or should run on segments belonging in that category.
+    These categories should be exactly the unique categories appearing in the [mouse-id]_annotation.xlsx files, or,
+    once ANNOTATION_DF contains all this data, in ANNOTATION_DF["interval_type"].unique().
     """
     _DATADOC_PATH = None
     GROUPING_DF = None  # df containing files belonging together in a session
-    SEGMENTATION_DF = None  # df containing segmentation
+    ANNOTATION_DF = None  # df containing annotation (temporal segmentation)
     COLORINGS_DF = None  # df containing color code for each mouse ID
     # df containing window side, type, injection side, type.
     WIN_INJ_TYPES_DF = None
@@ -45,18 +45,18 @@ class DataDocumentation:
                 f"{self._DATADOC_PATH} is not a valid duckdb file.")
 
     def checkCategoryConsistency(self):
-        n_segments = len(self.SEGMENTATION_DF["interval_type"].unique())
+        n_segments = len(self.ANNOTATION_DF["interval_type"].unique())
         n_segments_cnmf = len(self.SEGMENTS_CNMF_CATS.keys())
         n_segments_moco = len(self.SEGMENTS_MOCO_CATS.keys())
         if n_segments != n_segments_cnmf:
             raise Exception(
                 f"Found {n_segments} segment types in data documentation: \
-                {self.SEGMENTATION_DF['interval_type'].unique()} vs {n_segments_cnmf} defined in datadoc_util.py\
+                {self.ANNOTATION_DF['interval_type'].unique()} vs {n_segments_cnmf} defined in datadoc_util.py\
                 (SEGMENTS_CNMF_CATS): {self.SEGMENTS_CNMF_CATS.keys()}")
         if n_segments != n_segments_moco:
             raise Exception(
                 f"Found {n_segments} segment types in data documentation: \
-                           {self.SEGMENTATION_DF['interval_type'].unique()} vs {n_segments_cnmf} defined in datadoc_util.py\
+                           {self.ANNOTATION_DF['interval_type'].unique()} vs {n_segments_cnmf} defined in datadoc_util.py\
                            (SEGMENTS_MOCO_CATS): {self.SEGMENTS_MOCO_CATS.keys()}")
         print("DataDocumentation.checkCategoryConsistency(): Categories seem consistent.")
 
@@ -66,7 +66,7 @@ class DataDocumentation:
                 if "grouping" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
                         print(os.path.join(root, name))
-                elif "segmentation" in name:
+                elif "annotation" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
                         print(os.path.join(root, name))
 
@@ -108,8 +108,8 @@ class DataDocumentation:
         conn = duckdb.connect(self._DATADOC_PATH)
         self.GROUPING_DF = conn.execute(
             "SELECT * FROM grouping").fetchdf().fillna(np.NaN)
-        self.SEGMENTATION_DF = conn.execute(
-            "SELECT * FROM segmentation").fetchdf().fillna(np.NaN)
+        self.ANNOTATION_DF = conn.execute(
+            "SELECT * FROM annotation").fetchdf().fillna(np.NaN)
         self.WIN_INJ_TYPES_DF = conn.execute(
             "SELECT * FROM win_inj_types").fetchdf().fillna(np.NaN)
         self.EVENTS_DF = conn.execute(
@@ -142,17 +142,17 @@ class DataDocumentation:
                         else:
                             self.GROUPING_DF = pd.concat(
                                 [self.GROUPING_DF, df])
-                elif "segmentation" in name:
+                elif "annotation" in name:
                     if "~" in name:  # "~" on windows is used for temporary files that are opened in excel
                         raise Exception(
                             f"Please close all excel files and try again. Found temporary file in:\n{os.path.join(root, name)}")
                     else:
                         df = pd.read_excel(os.path.join(root, name))
-                        if self.SEGMENTATION_DF is None:
-                            self.SEGMENTATION_DF = df
+                        if self.ANNOTATION_DF is None:
+                            self.ANNOTATION_DF = df
                         else:
-                            self.SEGMENTATION_DF = pd.concat(
-                                [self.SEGMENTATION_DF, df])
+                            self.ANNOTATION_DF = pd.concat(
+                                [self.ANNOTATION_DF, df])
                 elif name == "window_injection_types_sides.xlsx":
                     self.WIN_INJ_TYPES_DF = pd.read_excel(
                         os.path.join(root, name))
@@ -165,9 +165,9 @@ class DataDocumentation:
         # adjust data types to match duckdb types
         self.GROUPING_DF.stim_length = self.GROUPING_DF.stim_length.astype(
             np.float32)  # reduce float64 to 32
-        self.SEGMENTATION_DF.frame_begin = self.SEGMENTATION_DF.frame_begin.astype(
+        self.ANNOTATION_DF.frame_begin = self.ANNOTATION_DF.frame_begin.astype(
             np.int32)
-        self.SEGMENTATION_DF.frame_end = self.SEGMENTATION_DF.frame_end.astype(
+        self.ANNOTATION_DF.frame_end = self.ANNOTATION_DF.frame_end.astype(
             np.int32)
 
     def setDataDriveSymbol(self, symbol: str = None):
@@ -269,12 +269,12 @@ class DataDocumentation:
 
     def getSegments(self, nd2_file):
         assert os.path.splitext(nd2_file)[-1] == ".nd2"
-        return self.SEGMENTATION_DF[self.SEGMENTATION_DF["nd2"] == nd2_file]
+        return self.ANNOTATION_DF[self.ANNOTATION_DF["nd2"] == nd2_file]
 
     def getSegmentsForUUID(self, uuid, as_df=True):
         nd2_file = self.GROUPING_DF[self.GROUPING_DF["uuid"]
                                     == uuid].nd2.values[0]
-        segments_df = self.SEGMENTATION_DF[self.SEGMENTATION_DF["nd2"] == nd2_file]
+        segments_df = self.ANNOTATION_DF[self.ANNOTATION_DF["nd2"] == nd2_file]
         segments_df = segments_df.drop("nd2", axis=1)
         if as_df:
             return segments_df
@@ -302,7 +302,7 @@ class DataDocumentation:
     def addUUIDColumnFromNd2(self, df):
         """
         Purpose: when returning dataframe, useful to add uuid column instead of only specifying nd2 files.
-        This function adds the uuid column to a dataframe (e.g. self.SEGMENTATION_DF)
+        This function adds the uuid column to a dataframe (e.g. self.ANNOTATION_DF)
         :param df:
         :return:
         """
@@ -337,7 +337,7 @@ class DataDocumentation:
             assert e_type in exptype_unique
 
         res_df = self.addUUIDColumnFromNd2(
-            self.SEGMENTATION_DF[self.SEGMENTATION_DF["interval_type"].isin(segment_types)])
+            self.ANNOTATION_DF[self.ANNOTATION_DF["interval_type"].isin(segment_types)])
         res_df["experiment_type"] = res_df.apply(
             lambda row: self.GROUPING_DF[self.GROUPING_DF["nd2"] == row["nd2"]].experiment_type.values[0], axis=1)
         res_df = res_df[res_df["experiment_type"].isin(experiment_types)]
@@ -407,7 +407,7 @@ class DataDocumentation:
         """
         nd2_file = self.GROUPING_DF[self.GROUPING_DF["uuid"]
                                     == uuid].nd2.values[0]
-        return self.SEGMENTATION_DF[(self.SEGMENTATION_DF["nd2"] == nd2_file) & (self.SEGMENTATION_DF["frame_begin"] <= frame) & (self.SEGMENTATION_DF["frame_end"] >= frame)]
+        return self.ANNOTATION_DF[(self.ANNOTATION_DF["nd2"] == nd2_file) & (self.ANNOTATION_DF["frame_begin"] <= frame) & (self.ANNOTATION_DF["frame_end"] >= frame)]
 
     def getColorForMouseId(self, mouse_id):
         if self.COLORINGS_DF is not None:
